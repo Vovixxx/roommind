@@ -39,13 +39,15 @@ from ..utils.device_utils import (
     IDLE_ACTION_LOW,
     IDLE_ACTION_OFF,
     IDLE_ACTION_SETBACK,
+    follow_setpoint,
     get_ac_eids,
     get_direct_setpoint_eids,
+    get_follow_setpoint_eids,
     get_idle_action,
     get_trv_eids,
     has_reliable_hvac_modes,
 )
-from ..utils.temp_utils import celsius_delta_to_ha, celsius_to_ha_temp
+from ..utils.temp_utils import celsius_delta_to_ha, celsius_to_ha_temp, ha_temp_to_celsius
 from .mpc_optimizer import MPCOptimizer, MPCPlan
 from .residual_heat import get_min_run_blocks
 from .thermal_model import RoomModelManager
@@ -743,6 +745,7 @@ class MPCController:
         self.acs: list[str] = get_ac_eids(room_config.get("devices", []))
         self._devices: list[dict] = room_config.get("devices", [])
         self._direct_eids: set[str] = get_direct_setpoint_eids(self._devices)
+        self._follow_eids: set[str] = get_follow_setpoint_eids(self._devices)
         self.climate_mode: str = room_config.get("climate_mode", "auto")
         self.outdoor_temp = outdoor_temp
         self.outdoor_forecast = outdoor_forecast or []
@@ -1474,7 +1477,9 @@ class MPCController:
                             t = min(trv_heat_boost, t)
                         else:
                             t = trv_heat_boost if self.has_external_sensor else effective_target
-                        t_final = effective_target if cmd.entity_id in self._direct_eids else t
+                        t_final = self._setpoint_for_device(
+                            cmd.entity_id, t, effective_target, current_temp
+                        )
                         ha_t = celsius_to_ha_temp(self.hass, t_final)
                         await self._call("set_hvac_mode", {"entity_id": cmd.entity_id, "hvac_mode": "heat"})
                         await self._call(
@@ -1493,7 +1498,9 @@ class MPCController:
                             t = min(ac_heat_boost, effective_target + self._ac_boost_delta, t)
                         else:
                             t = effective_target
-                        t_final = effective_target if cmd.entity_id in self._direct_eids else t
+                        t_final = self._setpoint_for_device(
+                            cmd.entity_id, t, effective_target, current_temp
+                        )
                         ha_t = celsius_to_ha_temp(self.hass, t_final)
                         ac_state = self.hass.states.get(cmd.entity_id)
                         ac_modes = _effective_ac_modes(ac_state)
@@ -1549,13 +1556,14 @@ class MPCController:
                 trv_target = min(trv_heat_boost, trv_target)
             else:
                 trv_target = trv_heat_boost if self.has_external_sensor else effective_target
-            ha_trv = celsius_to_ha_temp(self.hass, trv_target)
-            ha_trv_direct = celsius_to_ha_temp(self.hass, effective_target)
             for eid in thermostats:
                 if eid in _forced_off:
                     await async_idle_device(self.hass, eid, self._devices, area_id=self._area_id, targets=targets)
                     continue
-                ha_t = ha_trv_direct if eid in self._direct_eids else ha_trv
+                ha_t = celsius_to_ha_temp(
+                    self.hass,
+                    self._setpoint_for_device(eid, trv_target, effective_target, current_temp),
+                )
                 await self._call("set_hvac_mode", {"entity_id": eid, "hvac_mode": "heat"})
                 await self._call(
                     "set_temperature",
@@ -1573,13 +1581,14 @@ class MPCController:
                 ac_heat_target = min(ac_heat_boost, effective_target + self._ac_boost_delta, ac_heat_target)
             else:
                 ac_heat_target = effective_target
-            ha_ac_target = celsius_to_ha_temp(self.hass, ac_heat_target)
-            ha_ac_direct = celsius_to_ha_temp(self.hass, effective_target)
             for eid in acs:
                 if eid in _forced_off:
                     await async_idle_device(self.hass, eid, self._devices, area_id=self._area_id, targets=targets)
                     continue
-                ha_t = ha_ac_direct if eid in self._direct_eids else ha_ac_target
+                ha_t = celsius_to_ha_temp(
+                    self.hass,
+                    self._setpoint_for_device(eid, ac_heat_target, effective_target, current_temp),
+                )
                 ac_state = self.hass.states.get(eid)
                 ac_modes = _effective_ac_modes(ac_state)
                 if "heat" in ac_modes:
@@ -1610,13 +1619,14 @@ class MPCController:
                 ac_cool_target = min(effective_target, ac_cool_target)
             else:
                 ac_cool_target = effective_target
-            ha_target = celsius_to_ha_temp(self.hass, ac_cool_target)
-            ha_cool_direct = celsius_to_ha_temp(self.hass, effective_target)
             for eid in acs:
                 if eid in _forced_off:
                     await async_idle_device(self.hass, eid, self._devices, area_id=self._area_id, targets=targets)
                     continue
-                ha_t = ha_cool_direct if eid in self._direct_eids else ha_target
+                ha_t = celsius_to_ha_temp(
+                    self.hass,
+                    self._setpoint_for_device(eid, ac_cool_target, effective_target, current_temp),
+                )
                 await self._call("set_hvac_mode", {"entity_id": eid, "hvac_mode": "cool"})
                 await self._call(
                     "set_temperature",
@@ -1680,6 +1690,50 @@ class MPCController:
                     force_off=force_off,
                 )
 
+    def _setpoint_for_device(
+        self,
+        eid: str,
+        proportional: float,
+        effective_target: float,
+        current_temp: float | None,
+    ) -> float:
+        """Pick Direct, Follow, or Proportional for one climate entity."""
+        if eid in self._follow_eids:
+            return self._follow_command(eid, effective_target, current_temp)
+        if eid in self._direct_eids:
+            return effective_target
+        return proportional
+
+    def _follow_command(self, eid: str, effective_target: float, current_temp: float | None) -> float:
+        """Shift the room target into the climate entity's own sensor frame."""
+        if not self.has_external_sensor or current_temp is None:
+            return effective_target
+        state = self.hass.states.get(eid)
+        raw = None if state is None else state.attributes.get("current_temperature")
+        if raw is None:
+            return effective_target
+        try:
+            device_temp = ha_temp_to_celsius(self.hass, float(raw), entity_id=eid)
+        except (TypeError, ValueError):
+            return effective_target
+
+        min_temp: float | None = None
+        max_temp: float | None = None
+        if state is not None:
+            raw_min = state.attributes.get("min_temp")
+            raw_max = state.attributes.get("max_temp")
+            if raw_min is not None:
+                try:
+                    min_temp = ha_temp_to_celsius(self.hass, float(raw_min), entity_id=eid)
+                except (TypeError, ValueError):
+                    min_temp = None
+            if raw_max is not None:
+                try:
+                    max_temp = ha_temp_to_celsius(self.hass, float(raw_max), entity_id=eid)
+                except (TypeError, ValueError):
+                    max_temp = None
+        return follow_setpoint(effective_target, current_temp, device_temp, min_temp, max_temp)
+
     def _proportional_deadband(self, eid: str, current_temp: float | None, effective_target: float) -> float | None:
         """Deadband threshold for a proportional setpoint send, or None to disable.
 
@@ -1687,7 +1741,12 @@ class MPCController:
         direct-mode devices or managed mode. Finer near target so the final
         approach stays regulated.
         """
-        if self._approach_rate >= 1.0 or eid in self._direct_eids or not self.has_external_sensor:
+        if (
+            self._approach_rate >= 1.0
+            or eid in self._direct_eids
+            or eid in self._follow_eids
+            or not self.has_external_sensor
+        ):
             return None
         if current_temp is None:
             return None

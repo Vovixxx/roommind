@@ -81,7 +81,7 @@ export interface DeviceConfig {
   heating_system_type?: string;
   idle_action?: "off" | "fan_only" | "setback" | "low"; // default "off"
   idle_fan_mode?: string; // default "low"
-  setpoint_mode?: "proportional" | "direct"; // default "proportional"
+  setpoint_mode?: "proportional" | "direct" | "follow"; // default "proportional"
   coil_dry?: "inherit" | "on" | "off"; // default "inherit"
   coil_dry_minutes?: number; // 0 = inherit global
   coil_dry_mode?: "" | "fan_only" | "dry"; // "" = inherit global

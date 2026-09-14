@@ -408,6 +408,7 @@ export class RsDeviceSection extends LitElement {
       device?.idle_action === "fan_only" ||
       device?.idle_action === "setback" ||
       device?.idle_action === "low";
+    const showFollowBadge = device?.setpoint_mode === "follow" && !!this.selectedTempSensor;
     const showDirectBadge = device?.setpoint_mode === "direct" && !!this.selectedTempSensor;
 
     return html`
@@ -425,6 +426,11 @@ export class RsDeviceSection extends LitElement {
                 : device!.idle_action === "low"
                   ? localize("devices.idle_action_low", this.hass.language)
                   : localize("devices.idle_action_setback", this.hass.language)}
+            </span>`
+          : nothing}
+        ${showFollowBadge
+          ? html`<span class="valve-exclude-badge">
+              ${localize("devices.setpoint_mode_follow", this.hass.language)}
             </span>`
           : nothing}
         ${showDirectBadge
@@ -621,6 +627,11 @@ export class RsDeviceSection extends LitElement {
             (device?.coil_dry === "on" || (device?.coil_dry !== "off" && this.coilDryEnabledGlobal))
               ? html`<span class="meta-pill"
                   >${localize("devices.coil_dry_summary", this.hass.language)}</span
+                >`
+              : nothing}
+            ${device?.setpoint_mode === "follow" && this.selectedTempSensor
+              ? html`<span class="meta-pill"
+                  >${localize("devices.setpoint_mode_follow", this.hass.language)}</span
                 >`
               : nothing}
             ${device?.setpoint_mode === "direct" && this.selectedTempSensor
@@ -913,6 +924,10 @@ export class RsDeviceSection extends LitElement {
                     value: "direct",
                     label: localize("devices.setpoint_mode_direct", lang),
                   },
+                  {
+                    value: "follow",
+                    label: localize("devices.setpoint_mode_follow", lang),
+                  },
                 ]}
                 @selected=${(e: Event) => this._onSetpointModeChange(entityId, getSelectValue(e)!)}
                 @closed=${(e: Event) => e.stopPropagation()}
@@ -923,6 +938,9 @@ export class RsDeviceSection extends LitElement {
                 >
                 <ha-list-item value="direct"
                   >${localize("devices.setpoint_mode_direct", lang)}</ha-list-item
+                >
+                <ha-list-item value="follow"
+                  >${localize("devices.setpoint_mode_follow", lang)}</ha-list-item
                 >
               </ha-select>
               <rs-info-icon .text=${localize("devices.setpoint_mode_hint", lang)}></rs-info-icon>
@@ -1034,7 +1052,9 @@ export class RsDeviceSection extends LitElement {
 
   private _onSetpointModeChange(entityId: string, mode: string): void {
     const newDevices = this.devices.map((d) =>
-      d.entity_id === entityId ? { ...d, setpoint_mode: mode as "proportional" | "direct" } : d,
+      d.entity_id === entityId
+        ? { ...d, setpoint_mode: mode as "proportional" | "direct" | "follow" }
+        : d,
     );
     this._fireDeviceChanged(newDevices);
   }

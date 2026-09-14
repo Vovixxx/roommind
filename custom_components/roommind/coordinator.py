@@ -73,9 +73,11 @@ from .managers.weather_manager import WeatherManager
 from .managers.window_manager import WindowManager
 from .utils.device_utils import (
     build_rooms_devices_map,
+    follow_setpoint,
     get_ac_eids,
     get_all_entity_ids,
     get_direct_setpoint_eids,
+    get_follow_setpoint_eids,
     get_trv_eids,
     room_contributes_to_group,
 )
@@ -1283,6 +1285,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         """Build the final room state dictionary."""
         _room_devices = room.get("devices", [])
         _direct_eids = get_direct_setpoint_eids(_room_devices)
+        _follow_eids = get_follow_setpoint_eids(_room_devices)
         # Directness is evaluated only over the devices actually driven in the
         # current mode: cooling only ever commands ACs (TRVs are turned off),
         # heating can command both. Including mode-irrelevant devices in the
@@ -1294,6 +1297,19 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             set(get_ac_eids(_room_devices)) if mode == MODE_COOLING else set(get_all_entity_ids(_room_devices))
         )
         _all_direct = bool(_mode_relevant_eids) and _mode_relevant_eids <= _direct_eids
+        _all_follow = bool(_mode_relevant_eids) and _mode_relevant_eids <= _follow_eids
+
+        follow_display_temp: float | None = None
+        if heat_source_plan is not None:
+            active_cmds = [c for c in heat_source_plan.commands if c.active]
+            if active_cmds and active_cmds[0].entity_id in _follow_eids:
+                follow_display_temp = self._read_entity_temp_c(active_cmds[0].entity_id)
+        elif _all_follow:
+            follow_eids = (
+                get_ac_eids(_room_devices) if mode == MODE_COOLING else get_all_entity_ids(_room_devices)
+            )
+            if follow_eids:
+                follow_display_temp = self._read_entity_temp_c(follow_eids[0])
 
         return {
             "area_id": area_id,
@@ -1314,6 +1330,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 device_max_temp,
                 ac_device_max_temp,
                 direct_eids=_direct_eids,
+                follow_eids=_follow_eids,
+                device_temp=follow_display_temp,
             )
             if heat_source_plan is not None
             else self._compute_device_setpoint(
@@ -1327,6 +1345,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 has_thermostats=bool(get_trv_eids(_room_devices)),
                 has_acs=bool(get_ac_eids(_room_devices)),
                 all_direct=_all_direct,
+                all_follow=_all_follow,
+                device_temp=follow_display_temp,
             ),
             "window_open": window_open,
             **build_override_live(
@@ -1360,6 +1380,19 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             "coil_dry_entities": sorted(coil_dry.controlled_eids) if coil_dry else [],
         }
 
+    def _read_entity_temp_c(self, entity_id: str) -> float | None:
+        """Read a climate entity's current_temperature in Celsius."""
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return None
+        raw = state.attributes.get("current_temperature")
+        if raw is None:
+            return None
+        try:
+            return ha_temp_to_celsius(self.hass, float(raw), entity_id=entity_id)
+        except (TypeError, ValueError):
+            return None
+
     @staticmethod
     def _compute_device_setpoint_orchestrated(
         heat_source_plan: HeatSourcePlan,
@@ -1368,6 +1401,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         device_max_temp: float | None,
         ac_device_max_temp: float | None,
         direct_eids: set[str] | None = None,
+        follow_eids: set[str] | None = None,
+        device_temp: float | None = None,
     ) -> float | None:
         """Compute device setpoint from the orchestrated heat source plan."""
         if current_temp is None or target_temp is None:
@@ -1378,6 +1413,11 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             return None
         # Pick the first active command (primary preferred, then secondary)
         cmd = active_cmds[0]
+        if follow_eids and cmd.entity_id in follow_eids:
+            if device_temp is None:
+                return target_temp
+            max_t = device_max_temp if cmd.device_type == "thermostat" else ac_device_max_temp
+            return follow_setpoint(target_temp, current_temp, device_temp, max_temp=max_t)
         if direct_eids and cmd.entity_id in direct_eids:
             return target_temp
         if cmd.device_type == "thermostat":
@@ -1401,10 +1441,22 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         has_thermostats: bool = True,
         has_acs: bool = False,
         all_direct: bool = False,
+        all_follow: bool = False,
+        device_temp: float | None = None,
     ) -> float | None:
         """Compute the device setpoint for UI display (Full Control only)."""
         if not has_external_sensor or current_temp is None or target_temp is None:
             return None
+        if all_follow:
+            if device_temp is None:
+                return target_temp
+            return follow_setpoint(
+                target_temp,
+                current_temp,
+                device_temp,
+                min_temp=device_min_temp if mode == MODE_COOLING else None,
+                max_temp=device_max_temp if mode == MODE_HEATING else None,
+            )
         if all_direct:
             return target_temp
 
