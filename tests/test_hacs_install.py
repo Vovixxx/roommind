@@ -5,11 +5,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from awesomeversion import AwesomeVersion
+
+from custom_components.roommind.const import VERSION
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def _hacs_manifest() -> dict:
     return json.loads((ROOT / "hacs.json").read_text(encoding="utf-8"))
+
+
+def _integration_manifest() -> dict:
+    return json.loads((ROOT / "custom_components" / "roommind" / "manifest.json").read_text(encoding="utf-8"))
 
 
 def test_hacs_zip_release_hides_default_branch() -> None:
@@ -44,3 +52,29 @@ def test_hacs_ci_ignores_fork_github_metadata_checks() -> None:
     ignore = next(line.split(":", 1)[1].strip() for line in hacs_job.splitlines() if line.strip().startswith("ignore:"))
     ignored = set(ignore.split())
     assert {"issues", "topics"} <= ignored
+
+
+def test_version_is_newer_than_stock_roommind() -> None:
+    """HACS will not offer Follow if the fork still reports 1.7.6.
+
+    Stock RoomMind and this fork both shipped 1.7.6. Release tags like
+    v1.7.6-<sha> are prereleases, so AwesomeVersion treats them as older
+    than 1.7.6 and Companion keeps the two-option setpoint dropdown.
+    """
+    manifest = _integration_manifest()
+    assert manifest["version"] == VERSION
+    assert AwesomeVersion(VERSION) > AwesomeVersion("1.7.6")
+
+
+def test_panel_js_url_cache_busts_with_version() -> None:
+    """Companion caches /roommind/roommind-panel.js across HACS redownloads."""
+    init_py = (ROOT / "custom_components" / "roommind" / "__init__.py").read_text(encoding="utf-8")
+    assert 'f"/roommind/roommind-panel.js?v={VERSION}"' in init_py
+
+
+def test_setpoint_mode_dropdown_includes_follow() -> None:
+    """Follow must be a third <ha-list-item> in the Devices setpoint dropdown."""
+    source = (ROOT / "frontend" / "src" / "components" / "rs-device-section.ts").read_text(encoding="utf-8")
+    assert 'value="follow"' in source
+    assert source.count('value="follow"') >= 1
+    assert "setpoint_mode_follow" in source
