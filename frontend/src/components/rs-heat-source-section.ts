@@ -166,7 +166,9 @@ export class RsHeatSourceSection extends LitElement {
             )}</strong
           >
           · ${localize("heat_source.ac_min_outdoor", lang)}:
-          <strong>${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong>
+          <strong
+            >${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong
+          >
         </div>`;
       }
       return html`<div class="summary">
