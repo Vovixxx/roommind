@@ -1,12 +1,18 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   release:
     types: [published]
 
 jobs:
   build-and-upload:
     name: Build and upload release asset
+    # Skip the nested run that fires when this workflow creates a release.
+    if: github.event_name != 'release' || github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -29,7 +35,25 @@ jobs:
       - name: Create release zip
         run: cd custom_components/roommind && zip -r ../../roommind.zip . -x "__pycache__/*"
 
-      - name: Upload release asset
+      - name: Verify HACS zip contains the panel
+        run: |
+          unzip -l roommind.zip | grep -q 'roommind-panel.js'
+          unzip -l roommind.zip | grep -q 'manifest.json'
+
+      - name: Publish HACS release asset
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" roommind.zip --clobber
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            VERSION=$(python3 -c "import json; print(json.load(open('custom_components/roommind/manifest.json'))['version'])")
+            TAG="v${VERSION}-${GITHUB_SHA::7}"
+            gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+              --title "RoomMind ${TAG}" \
+              --notes "Automated HACS build of \`${GITHUB_SHA}\`. Contains the built frontend panel required for install." \
+              --target "$GITHUB_SHA"
+          fi
+          gh release upload "$TAG" roommind.zip --clobber
