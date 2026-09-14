@@ -108,6 +108,10 @@ async def test_create_defaults(store):
     assert room["heat_source_primary_delta"] == 1.5
     assert room["heat_source_outdoor_threshold"] == 5.0
     assert room["heat_source_ac_min_outdoor"] == -15.0
+    assert room["heat_source_policy"] == "efficiency"
+    assert room["heat_source_join_delta"] == 1.1
+    assert room["heat_source_join_hold_minutes"] == 30
+    assert room["heat_source_drop_hysteresis"] == 0.3
     assert room["climate_control_enabled"] is True
 
 
