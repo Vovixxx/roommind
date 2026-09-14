@@ -352,9 +352,7 @@ class TestEvaluateHeatSources:
         """Hydronic-first must not prefer the AC when outdoor is mild."""
         hass = _make_hass(["heat", "cool"])
         room = _make_room(policy="hydronic_first", outdoor_threshold=5.0)
-        result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.7, 19.0, 21.0, 12.0, "none", hass
-        )
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.7, 19.0, 21.0, 12.0, "none", hass)
         assert result is not None
         assert result.active_sources == "primary"
         assert [c for c in result.commands if c.device_type == "thermostat"][0].active
@@ -363,9 +361,7 @@ class TestEvaluateHeatSources:
     def test_hydronic_first_large_gap_does_not_join_immediately(self):
         hass = _make_hass(["heat", "cool"])
         room = _make_room(policy="hydronic_first")
-        result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.8, 17.0, 21.0, -5.0, "none", hass
-        )
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, -5.0, "none", hass)
         assert result is not None
         assert result.active_sources == "primary"
 
@@ -376,7 +372,14 @@ class TestEvaluateHeatSources:
         room["heat_source_join_hold_minutes"] = 30
         now = 2_000.0
         result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.8, 19.5, 21.0, 12.0, "primary", hass,
+            room,
+            MODE_HEATING,
+            0.8,
+            19.5,
+            21.0,
+            12.0,
+            "primary",
+            hass,
             now_monotonic=now,
             primary_on_since=now - 30 * 60,
         )
@@ -388,7 +391,14 @@ class TestEvaluateHeatSources:
         room = _make_room(policy="hydronic_first")
         now = 2_000.0
         result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.8, 19.5, 21.0, 12.0, "primary", hass,
+            room,
+            MODE_HEATING,
+            0.8,
+            19.5,
+            21.0,
+            12.0,
+            "primary",
+            hass,
             now_monotonic=now,
             primary_on_since=now - 10 * 60,
         )
@@ -401,7 +411,14 @@ class TestEvaluateHeatSources:
         now = 2_000.0
         # 0.5 °C short < 1.1 join delta, hold already elapsed
         result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.5, 20.5, 21.0, 12.0, "primary", hass,
+            room,
+            MODE_HEATING,
+            0.5,
+            20.5,
+            21.0,
+            12.0,
+            "primary",
+            hass,
             now_monotonic=now,
             primary_on_since=now - 40 * 60,
         )
@@ -416,7 +433,14 @@ class TestEvaluateHeatSources:
         now = 2_000.0
         # delta 0.9 is below join 1.1 but above 1.1-0.3=0.8
         result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.5, 20.1, 21.0, 12.0, "both", hass,
+            room,
+            MODE_HEATING,
+            0.5,
+            20.1,
+            21.0,
+            12.0,
+            "both",
+            hass,
             now_monotonic=now,
             primary_on_since=now - 40 * 60,
         )
@@ -430,7 +454,14 @@ class TestEvaluateHeatSources:
         room["heat_source_drop_hysteresis"] = 0.3
         now = 2_000.0
         result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.5, 20.3, 21.0, 12.0, "both", hass,
+            room,
+            MODE_HEATING,
+            0.5,
+            20.3,
+            21.0,
+            12.0,
+            "both",
+            hass,
             now_monotonic=now,
             primary_on_since=now - 40 * 60,
         )
@@ -441,9 +472,7 @@ class TestEvaluateHeatSources:
         """Air-first: ACs are primary even when outdoor is cold (above AC min)."""
         hass = _make_hass(["heat", "cool"])
         room = _make_room(policy="air_first", outdoor_threshold=5.0)
-        result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.7, 19.0, 21.0, -5.0, "none", hass
-        )
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.7, 19.0, 21.0, -5.0, "none", hass)
         assert result is not None
         assert result.active_sources == "secondary"
         assert [c for c in result.commands if c.device_type == "ac"][0].active
@@ -454,8 +483,6 @@ class TestEvaluateHeatSources:
         hass = _make_hass(["heat", "cool"])
         room = _make_room()
         room.pop("heat_source_policy", None)
-        result = evaluate_heat_sources(
-            room, MODE_HEATING, 0.7, 19.0, 21.0, 12.0, "none", hass
-        )
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.7, 19.0, 21.0, 12.0, "none", hass)
         assert result is not None
         assert result.active_sources == "secondary"

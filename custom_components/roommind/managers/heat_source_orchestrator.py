@@ -173,12 +173,14 @@ def evaluate_heat_sources(
 
     policy = room_config.get("heat_source_policy", DEFAULT_HEAT_SOURCE_POLICY)
 
+    stage1: list[tuple[str, str]] | None
+    stage2: list[tuple[str, str]] | None
     if policy == HEAT_SOURCE_POLICY_HYDRONIC_FIRST:
         stage1, stage2 = primary_devices, secondary_devices  # TRV, AC
     elif policy == HEAT_SOURCE_POLICY_AIR_FIRST:
         stage1, stage2 = secondary_devices, primary_devices  # AC, TRV
     else:
-        stage1 = stage2 = None
+        stage1, stage2 = None, None
 
     if stage1 is not None:
         # Stage 1 only while heating is needed; stage 2 is fallback if stage 1 is gone.
@@ -188,13 +190,14 @@ def evaluate_heat_sources(
         elif stage1:
             stage1_on, stage2_on = True, False
             if stage2:
-                join_delta = room_config.get(
-                    "heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA
+                join_delta = room_config.get("heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA)
+                hold_s = (
+                    room_config.get(
+                        "heat_source_join_hold_minutes",
+                        DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
+                    )
+                    * 60
                 )
-                hold_s = room_config.get(
-                    "heat_source_join_hold_minutes",
-                    DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
-                ) * 60
                 drop_h = room_config.get(
                     "heat_source_drop_hysteresis",
                     DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,

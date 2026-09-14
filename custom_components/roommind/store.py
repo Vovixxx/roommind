@@ -277,9 +277,7 @@ class RoomMindStore:
             ),
             "heat_source_ac_min_outdoor": config.get("heat_source_ac_min_outdoor", DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR),
             "heat_source_policy": config.get("heat_source_policy", DEFAULT_HEAT_SOURCE_POLICY),
-            "heat_source_join_delta": config.get(
-                "heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA
-            ),
+            "heat_source_join_delta": config.get("heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA),
             "heat_source_join_hold_minutes": config.get(
                 "heat_source_join_hold_minutes", DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES
             ),

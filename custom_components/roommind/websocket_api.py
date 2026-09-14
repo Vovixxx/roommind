@@ -415,18 +415,10 @@ async def websocket_list_rooms(
         vol.Optional("heat_source_primary_delta"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=5.0)),
         vol.Optional("heat_source_outdoor_threshold"): vol.All(vol.Coerce(float), vol.Range(min=-20, max=25)),
         vol.Optional("heat_source_ac_min_outdoor"): vol.All(vol.Coerce(float), vol.Range(min=-30, max=5)),
-        vol.Optional("heat_source_policy"): vol.In(
-            ["efficiency", "hydronic_first", "air_first"]
-        ),
-        vol.Optional("heat_source_join_delta"): vol.All(
-            vol.Coerce(float), vol.Range(min=0.5, max=3.0)
-        ),
-        vol.Optional("heat_source_join_hold_minutes"): vol.All(
-            vol.Coerce(int), vol.Range(min=15, max=90)
-        ),
-        vol.Optional("heat_source_drop_hysteresis"): vol.All(
-            vol.Coerce(float), vol.Range(min=0.1, max=1.5)
-        ),
+        vol.Optional("heat_source_policy"): vol.In(["efficiency", "hydronic_first", "air_first"]),
+        vol.Optional("heat_source_join_delta"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=3.0)),
+        vol.Optional("heat_source_join_hold_minutes"): vol.All(vol.Coerce(int), vol.Range(min=15, max=90)),
+        vol.Optional("heat_source_drop_hysteresis"): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=1.5)),
         vol.Optional("climate_control_enabled"): bool,
     }
 )
