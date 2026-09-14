@@ -2485,8 +2485,12 @@ async def test_turn_off_fallback_retries_when_device_still_active():
 
 
 @pytest.mark.asyncio
-async def test_call_cache_retries_when_device_contradicts():
-    """_call() with state='heat', temp=None, cache has same temp → re-sent (#134)."""
+async def test_call_cache_skips_when_ir_device_reports_hvac_but_no_setpoint():
+    """IR ACs often report heat/cool but never populate `temperature`.
+
+    The HVAC-state cache gate (#134) must not re-send the same setpoint every
+    coordinator cycle — that is the IR beep bug (#416).
+    """
     hass = build_hass()
     state = MagicMock()
     state.state = "heat"
@@ -2500,9 +2504,38 @@ async def test_call_cache_retries_when_device_contradicts():
     await ctrl._call("set_temperature", {"entity_id": "climate.living_trv", "temperature": 21.0})
     assert hass.services.async_call.call_count == 1
 
-    # Same command again: device reports state (not unavailable), so cache is NOT consulted
     await ctrl._call("set_temperature", {"entity_id": "climate.living_trv", "temperature": 21.0})
-    assert hass.services.async_call.call_count == 2
+    assert hass.services.async_call.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_call_cache_skips_ir_range_device_that_reports_hvac_but_no_setpoint():
+    """Same #416 gate for dual-setpoint IR devices that never report low/high."""
+    hass = build_hass()
+    state = MagicMock()
+    state.state = "heat_cool"
+    state.attributes = {
+        "hvac_modes": ["heat_cool", "off"],
+        "target_temp_low": None,
+        "target_temp_high": None,
+        "min_temp": 5.0,
+        "max_temp": 30.0,
+    }
+    hass.states.get = MagicMock(return_value=state)
+
+    room = make_room()
+    ctrl = MPCController(
+        hass, room, model_manager=RoomModelManager(), outdoor_temp=5.0, settings={}, has_external_sensor=True
+    )
+    data = {
+        "entity_id": "climate.living_ac",
+        "target_temp_low": 20.0,
+        "target_temp_high": 24.0,
+    }
+    await ctrl._call("set_temperature", data)
+    assert hass.services.async_call.call_count == 1
+    await ctrl._call("set_temperature", data)
+    assert hass.services.async_call.call_count == 1
 
 
 # ---------------------------------------------------------------------------

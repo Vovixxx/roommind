@@ -92,6 +92,21 @@ def _should_use_cache(state: Any) -> bool:
     return state.state in ("unavailable", "unknown")
 
 
+def _should_use_setpoint_cache(state: Any, data: dict) -> bool:
+    """Return True when a duplicate set_temperature may be skipped via cache.
+
+    ``_should_use_cache`` only trusts the cache when HVAC state is missing
+    (unavailable/unknown). IR integrations often report heat/cool after the
+    last command but never populate ``temperature`` / ``target_temp_low``.
+    Without this extra gate the same IR command is re-sent every cycle (#416).
+    """
+    if _should_use_cache(state):
+        return True
+    if "target_temp_low" in data:
+        return state.attributes.get("target_temp_low") is None
+    return state.attributes.get("temperature") is None
+
+
 def _snap_to_step(value: float, step: float | None) -> float:
     if step is None or step <= 0:
         return value
@@ -470,8 +485,8 @@ async def async_idle_device(
         if current_temp_attr is not None and abs(float(current_temp_attr) - ha_t) < 0.1:
             return
 
-        # Cache check (only for devices without reliable state feedback)
-        if _should_use_cache(state):
+        # Cache check for IR devices that report HVAC mode but no setpoint (#416)
+        if _should_use_setpoint_cache(state, {"temperature": ha_t}):
             cached = _last_commands.get(entity_id)
             if cached and cached.get("service") == "set_temperature" and cached.get("temperature") == ha_t:
                 return
@@ -1932,7 +1947,14 @@ class MPCController:
         # Fallback: check sent-command cache (for IR devices without state feedback).
         # Proportional deadband is intentionally NOT applied here — it is anchored to
         # live device state, while this branch handles IR/no-state devices via the cache.
-        if not skip and eid and _should_use_cache(state):
+        # set_temperature also consults the cache when HVAC state is real but the
+        # setpoint attribute is missing — typical IR ACs that beep every cycle (#416).
+        # set_hvac_mode keeps the stricter HVAC-state gate so a cached "off" cannot
+        # block retries when the device still reports heating (#134).
+        use_cmd_cache = (
+            _should_use_setpoint_cache(state, data) if service == "set_temperature" else _should_use_cache(state)
+        )
+        if not skip and eid and use_cmd_cache:
             cached = _last_commands.get(eid)
             if cached is not None and cached.get("service") == service:
                 if service == "set_hvac_mode":

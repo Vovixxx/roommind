@@ -111,18 +111,32 @@ def _migrate_storage_sync(storage_dir: Path) -> None:
             _LOGGER.info("Merged old history into 'roommind_history'")
 
 
+# Keys that live on hass.data[DOMAIN] alongside config-entry coordinators.
+_DOMAIN_SHARED_KEYS = frozenset({"store", "coordinator", "panel_registered"})
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a RoomMind config entry."""
     unload_ok: bool = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-        hass.data[DOMAIN].pop("coordinator", None)
+    if not unload_ok:
+        return False
 
-    # Remove panel if no entries remain
-    if not hass.data[DOMAIN]:
-        async_remove_panel(hass, "roommind")
+    coordinator = hass.data[DOMAIN].pop(entry.entry_id, None)
+    hass.data[DOMAIN].pop("coordinator", None)
+    if coordinator is not None:
+        await coordinator.async_shutdown()
 
-    return unload_ok
+    # Store and panel_registered stay on hass.data[DOMAIN] across reload, so
+    # emptiness of that dict is not a valid "last entry" signal.
+    remaining_entries = [key for key in hass.data[DOMAIN] if key not in _DOMAIN_SHARED_KEYS]
+    if not remaining_entries:
+        try:
+            async_remove_panel(hass, "roommind")
+        except (KeyError, ValueError):
+            _LOGGER.debug("RoomMind panel already removed")
+        hass.data[DOMAIN].pop("panel_registered", None)
+
+    return True
 
 
 async def _async_check_version_mismatch(hass: HomeAssistant) -> None:
