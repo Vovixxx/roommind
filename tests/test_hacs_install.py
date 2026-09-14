@@ -35,3 +35,12 @@ def test_release_workflow_publishes_hacs_zip_on_main_push() -> None:
     assert "gh release create" in workflow
     assert hacs["filename"] in workflow
     assert "npm run build" in workflow
+
+
+def test_hacs_ci_ignores_fork_github_metadata_checks() -> None:
+    """This fork has issues disabled and no GitHub topics; hacs/action must ignore those."""
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    hacs_job = workflow.split("hacs:")[1].split("hassfest:")[0]
+    ignore = next(line.split(":", 1)[1].strip() for line in hacs_job.splitlines() if line.strip().startswith("ignore:"))
+    ignored = set(ignore.split())
+    assert {"issues", "topics"} <= ignored

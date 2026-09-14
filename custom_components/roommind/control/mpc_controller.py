@@ -1477,9 +1477,7 @@ class MPCController:
                             t = min(trv_heat_boost, t)
                         else:
                             t = trv_heat_boost if self.has_external_sensor else effective_target
-                        t_final = self._setpoint_for_device(
-                            cmd.entity_id, t, effective_target, current_temp
-                        )
+                        t_final = self._setpoint_for_device(cmd.entity_id, t, effective_target, current_temp)
                         ha_t = celsius_to_ha_temp(self.hass, t_final)
                         await self._call("set_hvac_mode", {"entity_id": cmd.entity_id, "hvac_mode": "heat"})
                         await self._call(
@@ -1498,9 +1496,7 @@ class MPCController:
                             t = min(ac_heat_boost, effective_target + self._ac_boost_delta, t)
                         else:
                             t = effective_target
-                        t_final = self._setpoint_for_device(
-                            cmd.entity_id, t, effective_target, current_temp
-                        )
+                        t_final = self._setpoint_for_device(cmd.entity_id, t, effective_target, current_temp)
                         ha_t = celsius_to_ha_temp(self.hass, t_final)
                         ac_state = self.hass.states.get(cmd.entity_id)
                         ac_modes = _effective_ac_modes(ac_state)

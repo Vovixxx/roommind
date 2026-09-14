@@ -1318,9 +1318,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             if active_cmds and active_cmds[0].entity_id in _follow_eids:
                 follow_display_temp = self._read_entity_temp_c(active_cmds[0].entity_id)
         elif _all_follow:
-            follow_eids = (
-                get_ac_eids(_room_devices) if mode == MODE_COOLING else get_all_entity_ids(_room_devices)
-            )
+            follow_eids = get_ac_eids(_room_devices) if mode == MODE_COOLING else get_all_entity_ids(_room_devices)
             if follow_eids:
                 follow_display_temp = self._read_entity_temp_c(follow_eids[0])
 

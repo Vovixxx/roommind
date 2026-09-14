@@ -130,6 +130,9 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
+          # Fork repo metadata: issues are disabled and no GitHub topics are set.
+          # Custom-repo HACS installs do not need those default-store checks.
+          ignore: issues topics
 
   hassfest:
     name: Hassfest
