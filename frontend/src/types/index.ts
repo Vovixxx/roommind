@@ -155,6 +155,10 @@ export interface RoomConfig {
   heat_source_primary_delta?: number;
   heat_source_outdoor_threshold?: number;
   heat_source_ac_min_outdoor?: number;
+  heat_source_policy?: "efficiency" | "hydronic_first" | "air_first";
+  heat_source_join_delta?: number;
+  heat_source_join_hold_minutes?: number;
+  heat_source_drop_hysteresis?: number;
   climate_control_enabled?: boolean;
   live?: RoomLiveData;
 }

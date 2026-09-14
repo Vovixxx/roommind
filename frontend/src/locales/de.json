@@ -560,5 +560,19 @@
   "heat_source.ac_min_outdoor": "Min. Außentemp. für AC-Heizen",
   "heat_source.ac_min_outdoor_hint": "AC-Heizen unter dieser Temperatur komplett deaktivieren, um die Wärmepumpen-Hardware zu schützen.",
   "heat_source.ac_min_outdoor_suffix": "°C",
-  "heat_source.summary_disabled": "Intelligente Quellenwahl ist aus"
+  "heat_source.summary_disabled": "Intelligente Quellenwahl ist aus",
+  "heat_source.policy": "Quellenpriorität",
+  "heat_source.policy_hint": "Effizienz nutzt Außentemperatur und Temperaturlücke (RoomMind-Standard). Hydronisch zuerst betreibt immer zuerst die Heizkörper; Luft kommt erst nach der Wartezeit hinzu, wenn der Raum noch unter dem Ziel liegt. Luft zuerst kehrt diese Reihenfolge um. Der Schieberegler Steuerungspriorität wählt nicht die Anlage.",
+  "heat_source.policy_efficiency": "Effizienz (Standard)",
+  "heat_source.policy_hydronic_first": "Hydronisch zuerst",
+  "heat_source.policy_air_first": "Luft zuerst",
+  "heat_source.join_delta": "Zuschalt-Unterschreitung",
+  "heat_source.join_delta_hint": "Die zweite Anlage darf dazukommen, wenn der Raum noch mindestens so weit vom Heizziel entfernt ist (1,1 °C ≈ 2 °F).",
+  "heat_source.join_delta_suffix": "°C",
+  "heat_source.join_hold": "Zuschalt-Wartezeit",
+  "heat_source.join_hold_hint": "Die erste Anlage muss so lange laufen, bevor die zweite dazukommen darf.",
+  "heat_source.join_hold_suffix": "min",
+  "heat_source.drop_hysteresis": "Abschalt-Hysterese",
+  "heat_source.drop_hysteresis_hint": "Die zweite Anlage fällt ab, wenn die Unterschreitung so weit unter die Zuschalt-Unterschreitung fällt (0,3 °C ≈ 0,5 °F).",
+  "heat_source.drop_hysteresis_suffix": "°C"
 }

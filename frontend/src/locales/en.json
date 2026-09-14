@@ -560,5 +560,19 @@
   "heat_source.ac_min_outdoor": "Min. outdoor temp for AC heating",
   "heat_source.ac_min_outdoor_hint": "Disable AC heating entirely below this temperature to protect the heat pump hardware.",
   "heat_source.ac_min_outdoor_suffix": "°C",
-  "heat_source.summary_disabled": "Smart source selection is off"
+  "heat_source.summary_disabled": "Smart source selection is off",
+  "heat_source.policy": "Source priority",
+  "heat_source.policy_hint": "Efficiency uses outdoor temperature and gap (RoomMind default). Hydronic first always runs radiators first; air joins only after the wait if the room is still short. Air first reverses that order. The Control Priority slider does not choose the plant.",
+  "heat_source.policy_efficiency": "Efficiency (default)",
+  "heat_source.policy_hydronic_first": "Hydronic first",
+  "heat_source.policy_air_first": "Air first",
+  "heat_source.join_delta": "Join shortfall",
+  "heat_source.join_delta_hint": "Second plant may join when the room is still at least this far from the heat target (1.1 °C ≈ 2 °F).",
+  "heat_source.join_delta_suffix": "°C",
+  "heat_source.join_hold": "Join wait",
+  "heat_source.join_hold_hint": "First plant must run this long before the second may join.",
+  "heat_source.join_hold_suffix": "min",
+  "heat_source.drop_hysteresis": "Drop hysteresis",
+  "heat_source.drop_hysteresis_hint": "Second plant drops when the shortfall falls this far below the join shortfall (0.3 °C ≈ 0.5 °F).",
+  "heat_source.drop_hysteresis_suffix": "°C"
 }
