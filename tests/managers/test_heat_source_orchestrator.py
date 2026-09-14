@@ -468,6 +468,50 @@ class TestEvaluateHeatSources:
         assert result is not None
         assert result.active_sources == "primary"
 
+    def test_air_first_joins_after_hold_when_still_short(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="air_first")
+        room["heat_source_join_delta"] = 1.1
+        room["heat_source_join_hold_minutes"] = 30
+        now = 2_000.0
+        result = evaluate_heat_sources(
+            room,
+            MODE_HEATING,
+            0.8,
+            19.5,
+            21.0,
+            12.0,
+            "secondary",
+            hass,
+            now_monotonic=now,
+            primary_on_since=now - 30 * 60,
+        )
+        assert result is not None
+        assert result.active_sources == "both"
+
+    def test_air_first_drops_stage2_below_hysteresis(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="air_first")
+        room["heat_source_join_delta"] = 1.1
+        room["heat_source_drop_hysteresis"] = 0.3
+        now = 2_000.0
+        result = evaluate_heat_sources(
+            room,
+            MODE_HEATING,
+            0.5,
+            20.3,
+            21.0,
+            12.0,
+            "both",
+            hass,
+            now_monotonic=now,
+            primary_on_since=now - 40 * 60,
+        )
+        assert result is not None
+        assert result.active_sources == "secondary"
+        assert [c for c in result.commands if c.device_type == "ac"][0].active
+        assert not [c for c in result.commands if c.device_type == "thermostat"][0].active
+
     def test_air_first_cold_weather_keeps_secondary_as_stage1(self):
         """Air-first: ACs are primary even when outdoor is cold (above AC min)."""
         hass = _make_hass(["heat", "cool"])
