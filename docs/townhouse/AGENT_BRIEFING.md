@@ -233,7 +233,7 @@ Do **not** implement a new thermostat or a VTherm fork unless the user explicitl
 | later | Closed-room shared cool-only writer | Carrier |
 | later | Weather-compensated floor target + **max floor °F** (hardwood) | House C |
 
-1:1 hydronic-first + timed join (items 1 + timed join) is specified in [docs/superpowers/specs/2026-09-14-staging-feature-design.md](../superpowers/specs/2026-09-14-staging-feature-design.md) with implementation steps in [docs/superpowers/plans/2026-09-14-staging-feature.md](../superpowers/plans/2026-09-14-staging-feature.md). Dual heads, prefer-cool, and shared cool stay later.
+> 1:1 hydronic-first + timed join design: [docs/superpowers/specs/2026-09-14-staging-feature-design.md](../superpowers/specs/2026-09-14-staging-feature-design.md). Dual heads, prefer-cool, and shared cool are still later.
 
 ---
 

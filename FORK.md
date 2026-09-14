@@ -6,7 +6,7 @@ It is **not** a new thermostat, and it is **not** a Versatile Thermostat (VTherm
 
 **Product spec:** [docs/townhouse/AGENT_BRIEFING.md](docs/townhouse/AGENT_BRIEFING.md). That file is the source of truth. Do not fetch design Cloud Agent [`bc-01a09cfa-aa72-76ba-9941-df75d39a564f`](https://cursor.com/agents/bc-01a09cfa-aa72-76ba-9941-df75d39a564f) from this repo — that run has no GitHub repository.
 
-**Do not implement** a large hydronic-priority (or later topology/plant) patch until the user has tried stock RoomMind on a House B 1:1 room, unless they explicitly ask to start coding.
+**Hydronic-first + timed join for 1:1** is the approved first code slice; dual heads, prefer-cool, shared cool, and other topologies still wait for later work.
 
 ## Operating model
 
