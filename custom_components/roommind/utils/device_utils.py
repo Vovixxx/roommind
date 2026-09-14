@@ -30,6 +30,7 @@ DEFAULT_IDLE_SETBACK_OFFSET = 2.0
 
 SETPOINT_MODE_PROPORTIONAL = "proportional"
 SETPOINT_MODE_DIRECT = "direct"
+SETPOINT_MODE_FOLLOW = "follow"
 
 # --- Coil dry (evaporator anti-odour run) ---
 # These live here, not in const.py, because get_coil_dry_config() resolves them
@@ -272,6 +273,35 @@ def get_idle_action(devices: list[dict], entity_id: str) -> tuple[str, str]:
 def get_direct_setpoint_eids(devices: list[dict]) -> set[str]:
     """Return entity IDs of devices with setpoint_mode='direct'."""
     return {d["entity_id"] for d in devices if d.get("entity_id") and d.get("setpoint_mode") == SETPOINT_MODE_DIRECT}
+
+
+def get_follow_setpoint_eids(devices: list[dict]) -> set[str]:
+    """Return entity IDs of devices with setpoint_mode='follow'."""
+    return {d["entity_id"] for d in devices if d.get("entity_id") and d.get("setpoint_mode") == SETPOINT_MODE_FOLLOW}
+
+
+def follow_setpoint(
+    room_target: float,
+    room_temp: float,
+    device_temp: float,
+    min_temp: float | None = None,
+    max_temp: float | None = None,
+) -> float:
+    """Translate the room error into the device's own sensor frame.
+
+    The climate entity regulates against *device_temp* (return air, radiator
+    head, …), not the room sensor. Sending *room_target* stalls when that
+    reading is already on the far side of the target. Shift the command so
+    the device sees the same error the room still has:
+
+        command = room_target + (device_temp - room_temp)
+    """
+    command = room_target + (device_temp - room_temp)
+    if min_temp is not None:
+        command = max(min_temp, command)
+    if max_temp is not None:
+        command = min(max_temp, command)
+    return round(command, 1)
 
 
 def build_rooms_devices_map(rooms: dict) -> dict[str, list[dict]]:

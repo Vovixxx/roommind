@@ -1107,3 +1107,69 @@ async def test_hso_direct_setpoint_trv():
     assert len(temp_calls) == 1
     # Direct mode: receives target 21.0, NOT proportional boost (18 + 1.0*(30-18)=30)
     assert temp_calls[0][0][2]["temperature"] == 21.0
+
+
+@pytest.mark.asyncio
+async def test_hso_follow_setpoint_ac():
+    """Active Follow AC in HSO: room 20, target 22, return 23 → send 25."""
+    from custom_components.roommind.managers.heat_source_orchestrator import (
+        DeviceCommand,
+        HeatSourcePlan,
+    )
+
+    _last_commands.clear()
+    hass = build_hass()
+    ac_state = MagicMock()
+    ac_state.attributes = {
+        "current_temperature": 23.0,
+        "hvac_modes": ["heat", "cool", "off"],
+        "min_temp": 5.0,
+        "max_temp": 35.0,
+    }
+    hass.states.get = MagicMock(return_value=ac_state)
+    room = make_room(thermostats=[], acs=["climate.ac1"])
+    room["devices"] = [
+        {
+            "entity_id": "climate.ac1",
+            "type": "ac",
+            "role": "auto",
+            "heating_system_type": "",
+            "setpoint_mode": "follow",
+        },
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=5.0,
+        settings={},
+        has_external_sensor=True,
+    )
+
+    plan = HeatSourcePlan(
+        commands=[
+            DeviceCommand(
+                entity_id="climate.ac1",
+                role="secondary",
+                device_type="ac",
+                active=True,
+                power_fraction=1.0,
+                reason="follow heating",
+            ),
+        ],
+        active_sources="secondary",
+        reason="air heat",
+    )
+
+    await ctrl.async_apply(
+        mode=MODE_HEATING,
+        targets=TargetTemps(heat=22.0, cool=None),
+        power_fraction=1.0,
+        current_temp=20.0,
+        heat_source_plan=plan,
+    )
+
+    calls = hass.services.async_call.call_args_list
+    temp_calls = [c for c in calls if c[0][2].get("entity_id") == "climate.ac1" and c[0][1] == "set_temperature"]
+    assert len(temp_calls) == 1
+    assert temp_calls[0][0][2]["temperature"] == 25.0

@@ -4154,6 +4154,147 @@ async def test_proportional_setpoint_unchanged_default():
     assert temp_arg == HEATING_BOOST_TARGET
 
 
+def _climate_state(
+    current_temperature: float | None,
+    *,
+    hvac_modes: list[str] | None = None,
+    min_temp: float = 5.0,
+    max_temp: float = 35.0,
+):
+    state = MagicMock()
+    state.attributes = {
+        "current_temperature": current_temperature,
+        "hvac_modes": hvac_modes or ["heat", "cool", "off"],
+        "min_temp": min_temp,
+        "max_temp": max_temp,
+    }
+    return state
+
+
+@pytest.mark.asyncio
+async def test_follow_setpoint_ac_cooling_when_return_below_target():
+    """Follow AC: room 24, target 22, return 21 → send 19, not 22 or cool-boost 16."""
+    hass = build_hass()
+    hass.states.get = MagicMock(return_value=_climate_state(21.0, hvac_modes=["cool", "off"]))
+    room = make_room(thermostats=[], acs=["climate.ac"])
+    room["devices"] = [
+        {
+            "entity_id": "climate.ac",
+            "type": "ac",
+            "role": "auto",
+            "heating_system_type": "",
+            "setpoint_mode": "follow",
+        }
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=35.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    _last_commands.clear()
+    await ctrl.async_apply("cooling", 22.0, power_fraction=1.0, current_temp=24.0)
+
+    set_temp_calls = [c for c in hass.services.async_call.call_args_list if c[0][1] == "set_temperature"]
+    assert set_temp_calls
+    assert set_temp_calls[0][0][2]["temperature"] == 19.0
+
+
+@pytest.mark.asyncio
+async def test_follow_setpoint_trv_heating_when_head_above_target():
+    """Follow TRV: room 20, target 22, head 23 → send 25, not 22 or heat-boost 30."""
+    hass = build_hass()
+    hass.states.get = MagicMock(return_value=_climate_state(23.0))
+    room = make_room()
+    room["devices"] = [
+        {
+            "entity_id": "climate.living_trv",
+            "type": "trv",
+            "role": "auto",
+            "heating_system_type": "",
+            "setpoint_mode": "follow",
+        }
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=5.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    _last_commands.clear()
+    await ctrl.async_apply("heating", 22.0, power_fraction=1.0, current_temp=20.0)
+
+    set_temp_calls = [c for c in hass.services.async_call.call_args_list if c[0][1] == "set_temperature"]
+    assert set_temp_calls
+    assert set_temp_calls[0][0][2]["temperature"] == 25.0
+
+
+@pytest.mark.asyncio
+async def test_follow_setpoint_falls_back_to_direct_without_device_temp():
+    """Missing climate current_temperature → send the room target like Direct."""
+    hass = build_hass()
+    hass.states.get = MagicMock(return_value=_climate_state(None, hvac_modes=["cool", "off"]))
+    room = make_room(thermostats=[], acs=["climate.ac"])
+    room["devices"] = [
+        {
+            "entity_id": "climate.ac",
+            "type": "ac",
+            "role": "auto",
+            "heating_system_type": "",
+            "setpoint_mode": "follow",
+        }
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=35.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    _last_commands.clear()
+    await ctrl.async_apply("cooling", 22.0, power_fraction=1.0, current_temp=24.0)
+
+    set_temp_calls = [c for c in hass.services.async_call.call_args_list if c[0][1] == "set_temperature"]
+    assert set_temp_calls
+    assert set_temp_calls[0][0][2]["temperature"] == 22.0
+
+
+@pytest.mark.asyncio
+async def test_follow_setpoint_clamps_to_device_max():
+    """Follow heat command is clamped to the climate max_temp."""
+    hass = build_hass()
+    hass.states.get = MagicMock(return_value=_climate_state(23.0, max_temp=24.0))
+    room = make_room()
+    room["devices"] = [
+        {
+            "entity_id": "climate.living_trv",
+            "type": "trv",
+            "role": "auto",
+            "heating_system_type": "",
+            "setpoint_mode": "follow",
+        }
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=5.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    _last_commands.clear()
+    await ctrl.async_apply("heating", 22.0, power_fraction=1.0, current_temp=20.0)
+
+    set_temp_calls = [c for c in hass.services.async_call.call_args_list if c[0][1] == "set_temperature"]
+    assert set_temp_calls
+    assert set_temp_calls[0][0][2]["temperature"] == 24.0
+
+
 # ---------------------------------------------------------------------------
 # hvac_mode bundled with set_temperature (#337)
 # ---------------------------------------------------------------------------

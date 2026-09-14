@@ -8,18 +8,21 @@ from custom_components.roommind.utils.device_utils import (
     COIL_DRY_FAN_MODE_KEEP,
     DEFAULT_COIL_DRY_FAN_MODE,
     DEFAULT_COIL_DRY_MINUTES,
+    SETPOINT_MODE_FOLLOW,
     SETPOINT_MODE_PROPORTIONAL,
     VALID_DEVICE_TYPES,
     VALID_HEATING_SYSTEM_TYPES,
     build_rooms_devices_map,
     devices_to_legacy,
     ensure_room_has_devices,
+    follow_setpoint,
     get_ac_eids,
     get_all_entity_ids,
     get_coil_dry_config,
     get_device_by_eid,
     get_direct_setpoint_eids,
     get_entity_ids_by_type,
+    get_follow_setpoint_eids,
     get_idle_action,
     get_room_heating_system_type,
     get_trv_eids,
@@ -576,6 +579,50 @@ class TestGetDirectSetpointEids:
             {"entity_id": "climate.ok", "type": "trv", "setpoint_mode": "direct"},
         ]
         assert get_direct_setpoint_eids(devices) == {"climate.ok"}
+
+
+# ---------------------------------------------------------------------------
+# follow_setpoint / get_follow_setpoint_eids
+# ---------------------------------------------------------------------------
+
+
+class TestFollowSetpoint:
+    def test_cool_when_return_already_below_target(self):
+        """Room 24, target 22, return 21 → send 19 so the head still cools."""
+        assert follow_setpoint(22.0, 24.0, 21.0) == 19.0
+
+    def test_heat_when_head_already_above_target(self):
+        """Room 20, target 22, head 23 → send 25 so the plant still heats."""
+        assert follow_setpoint(22.0, 20.0, 23.0) == 25.0
+
+    def test_zero_offset_when_device_matches_room(self):
+        assert follow_setpoint(22.0, 21.0, 21.0) == 22.0
+
+    def test_clamps_to_max_temp(self):
+        assert follow_setpoint(22.0, 20.0, 23.0, max_temp=24.0) == 24.0
+
+    def test_clamps_to_min_temp(self):
+        assert follow_setpoint(22.0, 24.0, 21.0, min_temp=20.0) == 20.0
+
+    def test_rounds_to_one_decimal(self):
+        assert follow_setpoint(22.0, 23.3, 21.7) == 20.4
+
+
+class TestGetFollowSetpointEids:
+    def test_mixed_devices(self):
+        devices = [
+            {"entity_id": "climate.trv1", "type": "trv", "setpoint_mode": "proportional"},
+            {"entity_id": "climate.split", "type": "ac", "setpoint_mode": SETPOINT_MODE_FOLLOW},
+            {"entity_id": "climate.heater", "type": "trv", "setpoint_mode": "direct"},
+        ]
+        assert get_follow_setpoint_eids(devices) == {"climate.split"}
+
+    def test_missing_field_not_follow(self):
+        assert get_follow_setpoint_eids([{"entity_id": "climate.trv1", "type": "trv"}]) == set()
+
+    def test_direct_not_included(self):
+        devices = [{"entity_id": "climate.ac1", "type": "ac", "setpoint_mode": "direct"}]
+        assert get_follow_setpoint_eids(devices) == set()
 
 
 # ---------------------------------------------------------------------------

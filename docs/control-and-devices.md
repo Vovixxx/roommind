@@ -32,13 +32,13 @@ An external room temperature sensor is the key split:
 
 This matters for the options below.
 
-## Setpoint Mode: Proportional vs Direct
+## Setpoint Mode: Proportional, Direct, Follow
 
-`Setpoint mode` is relevant for thermostat/TRV devices in `Full Control` rooms.
+`Setpoint mode` applies to Thermostats and Climate Devices in `Full Control` rooms (an external room temperature sensor is assigned). Default remains `Proportional`.
 
 ### Proportional
 
-RoomMind calculates the required heating power, then sends a boosted device setpoint to achieve roughly that output.
+RoomMind calculates the required heating or cooling power, then sends a boosted device setpoint to achieve roughly that output.
 
 Example:
 
@@ -55,11 +55,32 @@ Best for:
 
 RoomMind sends the real target temperature and lets the device regulate itself.
 
+Use when the climate entity's `current_temperature` is the air you trust (true room / space-heater bulb).
+
 Best for:
 
 - space heaters
 - pellet stoves
 - devices with their own thermostat logic that should stay in control internally
+
+### Follow
+
+The climate entity regulates against its own sensor (mini-split **return air**, a radiator head), which is not the room sensor. Sending the room target then stalls: the unit already thinks it is past the setpoint.
+
+Follow translates the room error into that sensor:
+
+`command = room_target + (device_temp − room_temp)`
+
+clamped to the entity `min_temp` / `max_temp`. If the room sensor or the device reading is missing, Follow falls back to Direct.
+
+Example (cooling): room `24°C`, target `22°C`, return `21°C` → send `19°C` so the head still sees a `2°C` cooling error.
+
+Example (heating): room `20°C`, target `22°C`, head `23°C` → send `25°C` so the plant still sees a `2°C` heating error.
+
+Best for:
+
+- Mitsubishi / mini-splits whose `current_temperature` is return air
+- radiator thermostats whose bulb sits on the radiator, not in the room
 
 ## Idle Behavior: Off, Fan Only, Setback
 
