@@ -17,9 +17,7 @@ def _hacs_manifest() -> dict:
 
 
 def _integration_manifest() -> dict:
-    return json.loads(
-        (ROOT / "custom_components" / "roommind" / "manifest.json").read_text(encoding="utf-8")
-    )
+    return json.loads((ROOT / "custom_components" / "roommind" / "manifest.json").read_text(encoding="utf-8"))
 
 
 def test_hacs_zip_release_hides_default_branch() -> None:
@@ -70,17 +68,13 @@ def test_version_is_newer_than_stock_roommind() -> None:
 
 def test_panel_js_url_cache_busts_with_version() -> None:
     """Companion caches /roommind/roommind-panel.js across HACS redownloads."""
-    init_py = (ROOT / "custom_components" / "roommind" / "__init__.py").read_text(
-        encoding="utf-8"
-    )
+    init_py = (ROOT / "custom_components" / "roommind" / "__init__.py").read_text(encoding="utf-8")
     assert 'f"/roommind/roommind-panel.js?v={VERSION}"' in init_py
 
 
 def test_setpoint_mode_dropdown_includes_follow() -> None:
     """Follow must be a third <ha-list-item> in the Devices setpoint dropdown."""
-    source = (
-        ROOT / "frontend" / "src" / "components" / "rs-device-section.ts"
-    ).read_text(encoding="utf-8")
+    source = (ROOT / "frontend" / "src" / "components" / "rs-device-section.ts").read_text(encoding="utf-8")
     assert 'value="follow"' in source
     assert source.count('value="follow"') >= 1
     assert "setpoint_mode_follow" in source
