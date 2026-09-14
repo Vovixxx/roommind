@@ -2,16 +2,19 @@
 
 This repository is a **parallel fork** of [snazzybean/roommind](https://github.com/snazzybean/roommind).
 
-It is **not** a new thermostat, and it is **not** a Versatile Thermostat (VTherm) fork. RoomMind remains the product: its UI is the shell, its defaults stay RoomMind’s, and its `main` is merged here on an ongoing basis.
+It is **not** a new thermostat, and it is **not** a Versatile Thermostat (VTherm) fork. RoomMind remains the product: its UI is the shell, and its `main` is merged here on an ongoing basis.
 
-House climate work for this fork (House A / B / C, hydronic-first source priority, later zones and plant adapters) is specified in [docs/superpowers/specs/2026-09-14-house-abc-climate-design.md](docs/superpowers/specs/2026-09-14-house-abc-climate-design.md). That spec is the source of truth. **Do not implement plant, zone, or source-policy features until a live trial of stock/fork RoomMind has produced a specific patch request.**
+House climate work for this fork (live trial, then hydronic-first source priority, then zones and plant adapters) is specified in [docs/superpowers/specs/2026-09-14-house-abc-climate-design.md](docs/superpowers/specs/2026-09-14-house-abc-climate-design.md). That spec is the source of truth. **Do not implement plant, zone, or source-policy features until a live trial of stock/fork RoomMind has produced a specific patch request.**
+
+“Defaults stay RoomMind’s” is the **upstream** rule: do not silently change stock RoomMind for everyone. It is not permission to keep RoomMind’s efficiency/comfort plant picker as this house’s heating policy. After the trial patch, this house heats hydronic-first.
 
 ## Operating model
 
 | Rule | Meaning |
 | --- | --- |
 | Merge theirs | Always merge `snazzybean/roommind` `main` into this fork’s `main`. |
-| Defaults stay RoomMind’s | Optional fork features are off (or match upstream) unless the user turns them on. |
+| Defaults stay RoomMind’s | Data-model and product defaults match upstream unless a documented fork option is enabled for this house. |
+| This house ≠ the picker | Hydronic-first is the intended heating policy here after the Phase 1 patch. Do not treat smart source selection as the desired end state. |
 | Upstream PRs are optional | Generic bugfixes and features may be offered to RoomMind. They may take them or not. |
 | Fix on the fork | Trial bugs and house-specific gaps are fixed here first. |
 | RoomMind UI is the shell | Do not replace the panel with a new climate UI. |
