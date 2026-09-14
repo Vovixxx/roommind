@@ -20,6 +20,12 @@ It is **not** a new thermostat, and it is **not** a Versatile Thermostat (VTherm
 | RoomMind UI is the shell | One user-facing zone climate per area, not a new thermostat UI. |
 | Trial first | House B 1:1 room, Direct setpoint, smart source on to *feel* current HP-prefer behavior. |
 
+## HACS
+
+This fork is not in the HACS default store. Add `https://github.com/Vovixxx/roommind` as a custom **integration** repository.
+
+`hacs.json` uses `zip_release`, so HACS only installs from a GitHub **Release** asset named `roommind.zip` (not from a commit). Pushing to `main` publishes that asset via `.github/workflows/release.yml`. After the first release exists, refresh HACS and download the version — do not install the default branch.
+
 ## Sync upstream
 
 ```bash
