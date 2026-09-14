@@ -1855,6 +1855,35 @@ async def test_call_cache_device_state_takes_priority():
 
 
 @pytest.mark.asyncio
+async def test_call_cache_does_not_suppress_when_live_setpoint_disagrees():
+    """When the device reports a setpoint, live state wins over the sent-command cache.
+
+    Cache has 21 and we want 21, but the device currently shows 22 — that is a
+    failed command, not an IR no-feedback device. Re-send (#134 / #416 boundary).
+    """
+    hass = build_hass()
+    state = MagicMock()
+    state.state = "heat"
+    state.attributes = {"hvac_modes": ["heat", "off"], "temperature": 22.0, "min_temp": 5.0, "max_temp": 30.0}
+    hass.states.get = MagicMock(return_value=state)
+
+    _last_commands["climate.living_trv"] = {
+        "service": "set_temperature",
+        "hvac_mode": None,
+        "temperature": 21.0,
+        "target_temp_low": None,
+        "target_temp_high": None,
+    }
+
+    room = make_room()
+    ctrl = MPCController(
+        hass, room, model_manager=RoomModelManager(), outdoor_temp=5.0, settings={}, has_external_sensor=True
+    )
+    await ctrl._call("set_temperature", {"entity_id": "climate.living_trv", "temperature": 21.0})
+    hass.services.async_call.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_call_cache_not_updated_on_exception():
     """Cache is not updated when the service call raises an exception."""
     hass = build_hass()
