@@ -20,6 +20,9 @@ from homeassistant.core import HomeAssistant
 
 from ..const import (
     DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR,
+    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+    DEFAULT_HEAT_SOURCE_JOIN_DELTA,
+    DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
     DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD,
     DEFAULT_HEAT_SOURCE_POLICY,
     DEFAULT_HEAT_SOURCE_PRIMARY_DELTA,
@@ -87,6 +90,9 @@ def evaluate_heat_sources(
     outdoor_temp: float | None,
     previous_active_sources: str,
     hass: HomeAssistant,
+    *,
+    now_monotonic: float | None = None,
+    primary_on_since: float | None = None,
 ) -> HeatSourcePlan | None:
     """Evaluate which heating devices to activate.
 
@@ -176,10 +182,35 @@ def evaluate_heat_sources(
 
     if stage1 is not None:
         # Stage 1 only while heating is needed; stage 2 is fallback if stage 1 is gone.
+        # Timed join/drop: never use efficiency large-gap "both" for these policies.
         if delta_t <= 0:
             stage1_on = stage2_on = False
         elif stage1:
             stage1_on, stage2_on = True, False
+            if stage2:
+                join_delta = room_config.get(
+                    "heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA
+                )
+                hold_s = room_config.get(
+                    "heat_source_join_hold_minutes",
+                    DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
+                ) * 60
+                drop_h = room_config.get(
+                    "heat_source_drop_hysteresis",
+                    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+                )
+                hold_elapsed = (
+                    now_monotonic is not None
+                    and primary_on_since is not None
+                    and (now_monotonic - primary_on_since) >= hold_s
+                )
+                already_both = previous_active_sources == "both"
+                if already_both:
+                    stage2_on = delta_t > join_delta - drop_h
+                elif hold_elapsed and delta_t >= join_delta:
+                    stage2_on = True
+                else:
+                    stage2_on = False
         elif stage2:
             stage1_on, stage2_on = False, True
         else:

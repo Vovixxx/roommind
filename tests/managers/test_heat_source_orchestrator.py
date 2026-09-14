@@ -369,6 +369,74 @@ class TestEvaluateHeatSources:
         assert result is not None
         assert result.active_sources == "primary"
 
+    def test_hydronic_first_joins_after_hold_when_still_short(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="hydronic_first")
+        room["heat_source_join_delta"] = 1.1
+        room["heat_source_join_hold_minutes"] = 30
+        now = 2_000.0
+        result = evaluate_heat_sources(
+            room, MODE_HEATING, 0.8, 19.5, 21.0, 12.0, "primary", hass,
+            now_monotonic=now,
+            primary_on_since=now - 30 * 60,
+        )
+        assert result is not None
+        assert result.active_sources == "both"
+
+    def test_hydronic_first_does_not_join_before_hold(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="hydronic_first")
+        now = 2_000.0
+        result = evaluate_heat_sources(
+            room, MODE_HEATING, 0.8, 19.5, 21.0, 12.0, "primary", hass,
+            now_monotonic=now,
+            primary_on_since=now - 10 * 60,
+        )
+        assert result is not None
+        assert result.active_sources == "primary"
+
+    def test_hydronic_first_does_not_join_if_gap_recovered(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="hydronic_first")
+        now = 2_000.0
+        # 0.5 °C short < 1.1 join delta, hold already elapsed
+        result = evaluate_heat_sources(
+            room, MODE_HEATING, 0.5, 20.5, 21.0, 12.0, "primary", hass,
+            now_monotonic=now,
+            primary_on_since=now - 40 * 60,
+        )
+        assert result is not None
+        assert result.active_sources == "primary"
+
+    def test_hydronic_first_keeps_both_until_drop_hysteresis(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="hydronic_first")
+        room["heat_source_join_delta"] = 1.1
+        room["heat_source_drop_hysteresis"] = 0.3
+        now = 2_000.0
+        # delta 0.9 is below join 1.1 but above 1.1-0.3=0.8
+        result = evaluate_heat_sources(
+            room, MODE_HEATING, 0.5, 20.1, 21.0, 12.0, "both", hass,
+            now_monotonic=now,
+            primary_on_since=now - 40 * 60,
+        )
+        assert result is not None
+        assert result.active_sources == "both"
+
+    def test_hydronic_first_drops_stage2_below_hysteresis(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="hydronic_first")
+        room["heat_source_join_delta"] = 1.1
+        room["heat_source_drop_hysteresis"] = 0.3
+        now = 2_000.0
+        result = evaluate_heat_sources(
+            room, MODE_HEATING, 0.5, 20.3, 21.0, 12.0, "both", hass,
+            now_monotonic=now,
+            primary_on_since=now - 40 * 60,
+        )
+        assert result is not None
+        assert result.active_sources == "primary"
+
     def test_air_first_cold_weather_keeps_secondary_as_stage1(self):
         """Air-first: ACs are primary even when outdoor is cold (above AC min)."""
         hass = _make_hass(["heat", "cool"])
