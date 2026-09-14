@@ -93,6 +93,10 @@ export class RsRoomDetail extends LitElement {
   @state() private _heatSourcePrimaryDelta = 1.5;
   @state() private _heatSourceOutdoorThreshold = 5.0;
   @state() private _heatSourceAcMinOutdoor = -15.0;
+  @state() private _heatSourcePolicy: "efficiency" | "hydronic_first" | "air_first" = "efficiency";
+  @state() private _heatSourceJoinDelta = 1.1;
+  @state() private _heatSourceJoinHoldMinutes = 30;
+  @state() private _heatSourceDropHysteresis = 0.3;
   @state() private _optimisticCoverResume = false;
 
   private _prevAreaId: string | null = null;
@@ -296,6 +300,10 @@ export class RsRoomDetail extends LitElement {
       this._heatSourcePrimaryDelta = this.config.heat_source_primary_delta ?? 1.5;
       this._heatSourceOutdoorThreshold = this.config.heat_source_outdoor_threshold ?? 5.0;
       this._heatSourceAcMinOutdoor = this.config.heat_source_ac_min_outdoor ?? -15.0;
+      this._heatSourcePolicy = this.config.heat_source_policy ?? "efficiency";
+      this._heatSourceJoinDelta = this.config.heat_source_join_delta ?? 1.1;
+      this._heatSourceJoinHoldMinutes = this.config.heat_source_join_hold_minutes ?? 30;
+      this._heatSourceDropHysteresis = this.config.heat_source_drop_hysteresis ?? 0.3;
     } else {
       this._devices = [];
       this._selectedTempSensor = "";
@@ -336,6 +344,10 @@ export class RsRoomDetail extends LitElement {
       this._heatSourcePrimaryDelta = 1.5;
       this._heatSourceOutdoorThreshold = 5.0;
       this._heatSourceAcMinOutdoor = -15.0;
+      this._heatSourcePolicy = "efficiency";
+      this._heatSourceJoinDelta = 1.1;
+      this._heatSourceJoinHoldMinutes = 30;
+      this._heatSourceDropHysteresis = 0.3;
     }
     this._dirty = false;
 
@@ -599,6 +611,10 @@ export class RsRoomDetail extends LitElement {
                   .primaryDelta=${this._heatSourcePrimaryDelta}
                   .outdoorThreshold=${this._heatSourceOutdoorThreshold}
                   .acMinOutdoor=${this._heatSourceAcMinOutdoor}
+                  .policy=${this._heatSourcePolicy}
+                  .joinDelta=${this._heatSourceJoinDelta}
+                  .joinHoldMinutes=${this._heatSourceJoinHoldMinutes}
+                  .dropHysteresis=${this._heatSourceDropHysteresis}
                   @setting-changed=${this._onHeatSourceSettingChanged}
                 ></rs-heat-source-section>
               </rs-section-card>`
@@ -875,6 +891,10 @@ export class RsRoomDetail extends LitElement {
             .primaryDelta=${this._heatSourcePrimaryDelta}
             .outdoorThreshold=${this._heatSourceOutdoorThreshold}
             .acMinOutdoor=${this._heatSourceAcMinOutdoor}
+            .policy=${this._heatSourcePolicy}
+            .joinDelta=${this._heatSourceJoinDelta}
+            .joinHoldMinutes=${this._heatSourceJoinHoldMinutes}
+            .dropHysteresis=${this._heatSourceDropHysteresis}
             @setting-changed=${this._onHeatSourceSettingChanged}
           ></rs-heat-source-section>
         </rs-edit-dialog>`;
@@ -1059,6 +1079,13 @@ export class RsRoomDetail extends LitElement {
     else if (key === "heat_source_outdoor_threshold")
       this._heatSourceOutdoorThreshold = value as number;
     else if (key === "heat_source_ac_min_outdoor") this._heatSourceAcMinOutdoor = value as number;
+    else if (key === "heat_source_policy")
+      this._heatSourcePolicy = value as "efficiency" | "hydronic_first" | "air_first";
+    else if (key === "heat_source_join_delta") this._heatSourceJoinDelta = value as number;
+    else if (key === "heat_source_join_hold_minutes")
+      this._heatSourceJoinHoldMinutes = value as number;
+    else if (key === "heat_source_drop_hysteresis")
+      this._heatSourceDropHysteresis = value as number;
     this._autoSave();
   }
 
@@ -1134,6 +1161,10 @@ export class RsRoomDetail extends LitElement {
         heat_source_primary_delta: this._heatSourcePrimaryDelta,
         heat_source_outdoor_threshold: this._heatSourceOutdoorThreshold,
         heat_source_ac_min_outdoor: this._heatSourceAcMinOutdoor,
+        heat_source_policy: this._heatSourcePolicy,
+        heat_source_join_delta: this._heatSourceJoinDelta,
+        heat_source_join_hold_minutes: this._heatSourceJoinHoldMinutes,
+        heat_source_drop_hysteresis: this._heatSourceDropHysteresis,
       });
 
       this._dirty = false;

@@ -167,6 +167,18 @@ COVER_DAILY_LOOKAHEAD_H: float = 8.0  # hours ahead to search for daily solar pe
 DEFAULT_HEAT_SOURCE_PRIMARY_DELTA = 1.5  # °C gap to engage primary (boiler/radiator)
 DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD = 5.0  # °C outdoor: above = prefer AC, below = prefer boiler
 DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR = -15.0  # °C hard-disable AC heating below this
+HEAT_SOURCE_POLICY_EFFICIENCY = "efficiency"
+HEAT_SOURCE_POLICY_HYDRONIC_FIRST = "hydronic_first"
+HEAT_SOURCE_POLICY_AIR_FIRST = "air_first"
+HEAT_SOURCE_POLICIES = [
+    HEAT_SOURCE_POLICY_EFFICIENCY,
+    HEAT_SOURCE_POLICY_HYDRONIC_FIRST,
+    HEAT_SOURCE_POLICY_AIR_FIRST,
+]
+DEFAULT_HEAT_SOURCE_POLICY = HEAT_SOURCE_POLICY_EFFICIENCY
+DEFAULT_HEAT_SOURCE_JOIN_DELTA = 1.1  # °C ≈ 2°F
+DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES = 30
+DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS = 0.3  # °C ≈ 0.5°F
 HEAT_SOURCE_HYSTERESIS = 0.3  # °C hysteresis band to prevent oscillation
 HEAT_SOURCE_LARGE_GAP_MULTIPLIER = 2.0  # activate both sources when gap > primary_delta * this
 HEAT_SOURCE_SECONDARY_POWER_SCALE = 0.7  # throttle secondary when both active (prevent overshoot)

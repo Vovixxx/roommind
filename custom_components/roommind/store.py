@@ -14,7 +14,11 @@ from .const import (
     DEFAULT_ECO_COOL,
     DEFAULT_ECO_HEAT,
     DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR,
+    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+    DEFAULT_HEAT_SOURCE_JOIN_DELTA,
+    DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
     DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD,
+    DEFAULT_HEAT_SOURCE_POLICY,
     DEFAULT_HEAT_SOURCE_PRIMARY_DELTA,
     DOMAIN,
 )
@@ -272,6 +276,14 @@ class RoomMindStore:
                 "heat_source_outdoor_threshold", DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD
             ),
             "heat_source_ac_min_outdoor": config.get("heat_source_ac_min_outdoor", DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR),
+            "heat_source_policy": config.get("heat_source_policy", DEFAULT_HEAT_SOURCE_POLICY),
+            "heat_source_join_delta": config.get("heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA),
+            "heat_source_join_hold_minutes": config.get(
+                "heat_source_join_hold_minutes", DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES
+            ),
+            "heat_source_drop_hysteresis": config.get(
+                "heat_source_drop_hysteresis", DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS
+            ),
             "climate_control_enabled": config.get("climate_control_enabled", True),
         }
         # Directional device sync for new rooms (truthiness check, not just presence)

@@ -561,5 +561,19 @@
   "heat_source.ac_min_outdoor": "Température extérieure min. pour la climatisation",
   "heat_source.ac_min_outdoor_hint": "Désactiver complètement la climatisation en dessous de cette température pour protéger le matériel de la pompe à chaleur.",
   "heat_source.ac_min_outdoor_suffix": "°C",
-  "heat_source.summary_disabled": "La sélection intelligente de la source est désactivée"
+  "heat_source.summary_disabled": "La sélection intelligente de la source est désactivée",
+  "heat_source.policy": "Priorité des sources",
+  "heat_source.policy_hint": "Efficacité utilise la température extérieure et l'écart (défaut RoomMind). Hydronique d'abord fait toujours tourner les radiateurs en premier ; l'air n'intervient qu'après l'attente si la pièce est encore en dessous. Air d'abord inverse cet ordre. Le curseur Priorité de contrôle ne choisit pas l'installation.",
+  "heat_source.policy_efficiency": "Efficacité (défaut)",
+  "heat_source.policy_hydronic_first": "Hydronique d'abord",
+  "heat_source.policy_air_first": "Air d'abord",
+  "heat_source.join_delta": "Écart de raccordement",
+  "heat_source.join_delta_hint": "La deuxième installation peut intervenir lorsque la pièce est encore au moins aussi loin de la cible de chauffage (1,1 °C ≈ 2 °F).",
+  "heat_source.join_delta_suffix": "°C",
+  "heat_source.join_hold": "Attente de raccordement",
+  "heat_source.join_hold_hint": "La première installation doit fonctionner pendant cette durée avant que la deuxième puisse intervenir.",
+  "heat_source.join_hold_suffix": "min",
+  "heat_source.drop_hysteresis": "Hystérésis de coupure",
+  "heat_source.drop_hysteresis_hint": "La deuxième installation s'arrête lorsque l'écart tombe d'autant sous l'écart de raccordement (0,3 °C ≈ 0,5 °F).",
+  "heat_source.drop_hysteresis_suffix": "°C"
 }

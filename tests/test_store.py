@@ -429,6 +429,36 @@ async def test_save_room_defaults_heat_source_orchestration(store):
 
 
 @pytest.mark.asyncio
+async def test_save_room_defaults_heat_source_policy(store):
+    """New staging fields default to efficiency + 2°F/30 min join."""
+    await store.async_load()
+    room = await store.async_save_room("wohnzimmer", {})
+    assert room["heat_source_policy"] == "efficiency"
+    assert room["heat_source_join_delta"] == 1.1
+    assert room["heat_source_join_hold_minutes"] == 30
+    assert room["heat_source_drop_hysteresis"] == 0.3
+
+
+@pytest.mark.asyncio
+async def test_save_room_heat_source_policy_explicit_values(store):
+    await store.async_load()
+    room = await store.async_save_room(
+        "wohnzimmer",
+        {
+            "heat_source_orchestration": True,
+            "heat_source_policy": "hydronic_first",
+            "heat_source_join_delta": 1.5,
+            "heat_source_join_hold_minutes": 45,
+            "heat_source_drop_hysteresis": 0.6,
+        },
+    )
+    assert room["heat_source_policy"] == "hydronic_first"
+    assert room["heat_source_join_delta"] == 1.5
+    assert room["heat_source_join_hold_minutes"] == 45
+    assert room["heat_source_drop_hysteresis"] == 0.6
+
+
+@pytest.mark.asyncio
 async def test_save_room_heat_source_explicit_values(store):
     """Saving with explicit heat source config stores them correctly."""
     await store.async_load()

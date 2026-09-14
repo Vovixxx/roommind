@@ -170,6 +170,67 @@ class TestHeatSourceOrchestration:
         assert "living_room_abc12345" not in coordinator._heat_source_states
 
     @pytest.mark.asyncio
+    async def test_primary_on_since_starts_and_clears(self, hass, mock_config_entry):
+        from custom_components.roommind.managers.heat_source_orchestrator import (
+            HeatSourcePlan,
+        )
+
+        store = _make_store_mock({"living_room_abc12345": self.ROOM_WITH_BOTH})
+        hass.data = {"roommind": {"store": store}}
+        hass.states.get = MagicMock(side_effect=make_mock_states_get(temp="18.0"))
+        hass.services.async_call = AsyncMock()
+
+        plan_primary = HeatSourcePlan(commands=[], active_sources="primary", reason="t")
+        with patch(
+            "custom_components.roommind.coordinator.evaluate_heat_sources",
+            return_value=plan_primary,
+        ) as mock_evaluate:
+            coordinator = _create_coordinator(hass, mock_config_entry)
+            await coordinator._async_update_data()
+            assert "living_room_abc12345" in coordinator._heat_source_primary_on_since
+            first_ts = coordinator._heat_source_primary_on_since["living_room_abc12345"]
+            await coordinator._async_update_data()
+            assert coordinator._heat_source_primary_on_since["living_room_abc12345"] == first_ts
+            kwargs = mock_evaluate.call_args.kwargs
+            assert kwargs["primary_on_since"] == first_ts
+            assert kwargs["now_monotonic"] is not None
+
+        plan_none = HeatSourcePlan(commands=[], active_sources="none", reason="t")
+        with patch(
+            "custom_components.roommind.coordinator.evaluate_heat_sources",
+            return_value=plan_none,
+        ):
+            await coordinator._async_update_data()
+            assert "living_room_abc12345" not in coordinator._heat_source_primary_on_since
+
+    @pytest.mark.asyncio
+    async def test_air_first_primary_on_since_starts_on_secondary(self, hass, mock_config_entry):
+        from custom_components.roommind.managers.heat_source_orchestrator import (
+            HeatSourcePlan,
+        )
+
+        room = {**self.ROOM_WITH_BOTH, "heat_source_policy": "air_first"}
+        store = _make_store_mock({"living_room_abc12345": room})
+        hass.data = {"roommind": {"store": store}}
+        hass.states.get = MagicMock(side_effect=make_mock_states_get(temp="18.0"))
+        hass.services.async_call = AsyncMock()
+
+        plan_secondary = HeatSourcePlan(commands=[], active_sources="secondary", reason="t")
+        with patch(
+            "custom_components.roommind.coordinator.evaluate_heat_sources",
+            return_value=plan_secondary,
+        ) as mock_evaluate:
+            coordinator = _create_coordinator(hass, mock_config_entry)
+            await coordinator._async_update_data()
+            assert "living_room_abc12345" in coordinator._heat_source_primary_on_since
+            first_ts = coordinator._heat_source_primary_on_since["living_room_abc12345"]
+            await coordinator._async_update_data()
+            assert coordinator._heat_source_primary_on_since["living_room_abc12345"] == first_ts
+            kwargs = mock_evaluate.call_args.kwargs
+            assert kwargs["primary_on_since"] == first_ts
+            assert kwargs["now_monotonic"] is not None
+
+    @pytest.mark.asyncio
     async def test_state_cleanup_on_room_deletion(self, hass, mock_config_entry):
         """async_room_removed cleans up _heat_source_states for the deleted room."""
         coordinator = _create_coordinator(hass, mock_config_entry)
@@ -178,6 +239,8 @@ class TestHeatSourceOrchestration:
         # Seed some state
         coordinator._heat_source_states["test_room_123"] = "primary"
         coordinator._heat_source_states["other_room_456"] = "secondary"
+        coordinator._heat_source_primary_on_since["test_room_123"] = 12.0
+        coordinator._heat_source_primary_on_since["other_room_456"] = 34.0
 
         mock_registry = MagicMock()
         mock_registry.entities = MagicMock()
@@ -190,8 +253,10 @@ class TestHeatSourceOrchestration:
             await coordinator.async_room_removed("test_room_123")
 
         assert "test_room_123" not in coordinator._heat_source_states
+        assert "test_room_123" not in coordinator._heat_source_primary_on_since
         # Other rooms are not affected
         assert coordinator._heat_source_states["other_room_456"] == "secondary"
+        assert coordinator._heat_source_primary_on_since["other_room_456"] == 34.0
 
     @pytest.mark.asyncio
     async def test_active_heat_sources_in_live_data(self, hass, mock_config_entry):

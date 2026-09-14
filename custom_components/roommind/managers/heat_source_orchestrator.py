@@ -20,10 +20,16 @@ from homeassistant.core import HomeAssistant
 
 from ..const import (
     DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR,
+    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+    DEFAULT_HEAT_SOURCE_JOIN_DELTA,
+    DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
     DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD,
+    DEFAULT_HEAT_SOURCE_POLICY,
     DEFAULT_HEAT_SOURCE_PRIMARY_DELTA,
     HEAT_SOURCE_HYSTERESIS,
     HEAT_SOURCE_LARGE_GAP_MULTIPLIER,
+    HEAT_SOURCE_POLICY_AIR_FIRST,
+    HEAT_SOURCE_POLICY_HYDRONIC_FIRST,
     HEAT_SOURCE_SECONDARY_POWER_SCALE,
     MODE_HEATING,
 )
@@ -84,6 +90,9 @@ def evaluate_heat_sources(
     outdoor_temp: float | None,
     previous_active_sources: str,
     hass: HomeAssistant,
+    *,
+    now_monotonic: float | None = None,
+    primary_on_since: float | None = None,
 ) -> HeatSourcePlan | None:
     """Evaluate which heating devices to activate.
 
@@ -162,35 +171,93 @@ def evaluate_heat_sources(
     primary_devices = [(eid, dt) for eid, dt in primary_devices if dt != "thermostat" or _is_available(hass, eid)]
     secondary_devices = [(eid, dt) for eid, dt in secondary_devices if dt != "thermostat" or _is_available(hass, eid)]
 
-    # Determine which source group to activate
-    large_gap_threshold = primary_delta * HEAT_SOURCE_LARGE_GAP_MULTIPLIER
+    policy = room_config.get("heat_source_policy", DEFAULT_HEAT_SOURCE_POLICY)
 
-    # Weather-based preference with hysteresis (None when no outdoor data available)
-    prefer_ac: bool | None
-    if outdoor_temp is not None:
-        if previous_active_sources == "secondary":
-            # AC was active: keep unless outdoor drops below threshold - hysteresis
-            prefer_ac = outdoor_temp > outdoor_threshold - HEAT_SOURCE_HYSTERESIS
-        elif previous_active_sources == "primary":
-            # Boiler was active: keep unless outdoor rises above threshold + hysteresis
-            prefer_ac = outdoor_temp > outdoor_threshold + HEAT_SOURCE_HYSTERESIS
+    stage1: list[tuple[str, str]] | None
+    stage2: list[tuple[str, str]] | None
+    if policy == HEAT_SOURCE_POLICY_HYDRONIC_FIRST:
+        stage1, stage2 = primary_devices, secondary_devices  # TRV, AC
+    elif policy == HEAT_SOURCE_POLICY_AIR_FIRST:
+        stage1, stage2 = secondary_devices, primary_devices  # AC, TRV
+    else:
+        stage1, stage2 = None, None
+
+    if stage1 is not None:
+        # Stage 1 only while heating is needed; stage 2 is fallback if stage 1 is gone.
+        # Timed join/drop: never use efficiency large-gap "both" for these policies.
+        if delta_t <= 0:
+            stage1_on = stage2_on = False
+        elif stage1:
+            stage1_on, stage2_on = True, False
+            if stage2:
+                join_delta = room_config.get("heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA)
+                hold_s = (
+                    room_config.get(
+                        "heat_source_join_hold_minutes",
+                        DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
+                    )
+                    * 60
+                )
+                drop_h = room_config.get(
+                    "heat_source_drop_hysteresis",
+                    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+                )
+                hold_elapsed = (
+                    now_monotonic is not None
+                    and primary_on_since is not None
+                    and (now_monotonic - primary_on_since) >= hold_s
+                )
+                already_both = previous_active_sources == "both"
+                if already_both:
+                    stage2_on = delta_t > join_delta - drop_h
+                elif hold_elapsed and delta_t >= join_delta:
+                    stage2_on = True
+                else:
+                    stage2_on = False
+        elif stage2:
+            stage1_on, stage2_on = False, True
         else:
-            prefer_ac = outdoor_temp > outdoor_threshold
+            stage1_on = stage2_on = False
+        trv_on = stage1_on if policy == HEAT_SOURCE_POLICY_HYDRONIC_FIRST else stage2_on
+        ac_on = stage2_on if policy == HEAT_SOURCE_POLICY_HYDRONIC_FIRST else stage1_on
+        if trv_on and ac_on:
+            active = "both"
+        elif trv_on:
+            active = "primary"
+        elif ac_on:
+            active = "secondary"
+        else:
+            active = "none"
     else:
-        prefer_ac = None
+        # Efficiency policy: weather + large-gap join (unchanged)
+        large_gap_threshold = primary_delta * HEAT_SOURCE_LARGE_GAP_MULTIPLIER
 
-    # "both" when gap is large, or hysteresis holds "both" state
-    if delta_t >= large_gap_threshold + HEAT_SOURCE_HYSTERESIS:
-        active = "both"
-    elif previous_active_sources == "both" and delta_t > primary_delta - HEAT_SOURCE_HYSTERESIS:
-        active = "both"
-    elif prefer_ac is True:
-        active = "secondary"
-    elif prefer_ac is False:
-        active = "primary"
-    else:
-        # No outdoor data: delta-T heuristic (backward compatible)
-        active = "primary" if delta_t >= primary_delta + HEAT_SOURCE_HYSTERESIS else "secondary"
+        # Weather-based preference with hysteresis (None when no outdoor data available)
+        prefer_ac: bool | None
+        if outdoor_temp is not None:
+            if previous_active_sources == "secondary":
+                # AC was active: keep unless outdoor drops below threshold - hysteresis
+                prefer_ac = outdoor_temp > outdoor_threshold - HEAT_SOURCE_HYSTERESIS
+            elif previous_active_sources == "primary":
+                # Boiler was active: keep unless outdoor rises above threshold + hysteresis
+                prefer_ac = outdoor_temp > outdoor_threshold + HEAT_SOURCE_HYSTERESIS
+            else:
+                prefer_ac = outdoor_temp > outdoor_threshold
+        else:
+            prefer_ac = None
+
+        # "both" when gap is large, or hysteresis holds "both" state
+        if delta_t >= large_gap_threshold + HEAT_SOURCE_HYSTERESIS:
+            active = "both"
+        elif previous_active_sources == "both" and delta_t > primary_delta - HEAT_SOURCE_HYSTERESIS:
+            active = "both"
+        elif prefer_ac is True:
+            active = "secondary"
+        elif prefer_ac is False:
+            active = "primary"
+        else:
+            # No outdoor data: delta-T heuristic (backward compatible)
+            active = "primary" if delta_t >= primary_delta + HEAT_SOURCE_HYSTERESIS else "secondary"
 
     # Edge case: if chosen group has no devices, fall back
     if active == "secondary" and not secondary_devices:

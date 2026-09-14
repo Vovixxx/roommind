@@ -223,15 +223,16 @@ Do **not** implement a new thermostat or a VTherm fork unless the user explicitl
 | Order | Work | Notes |
 | --- | --- | --- |
 | 0 | User trial + gap list | No large code until they have lived with stock RoomMind |
-| 1 | Optional **source priority**: hydronic first \| air first \| (their) efficiency | Defaults stay RoomMind’s efficiency policy for other users. These houses: hydronic first. Comfort/efficiency slider must not pick the plant. |
+| 1 | **Done:** 1:1 hydronic-first + timed join | Optional **source priority**: hydronic first \| air first \| (their) efficiency. Defaults stay RoomMind’s efficiency policy for other users. These houses: hydronic first. Comfort/efficiency slider must not pick the plant. Timed join (2°F / 30–45 min) replaces “both when gap is large” for these houses. |
 | 2 | Bugfixes found in trial | Fork immediately; upstream PR if clean |
-| later | Timed join (2°F / 30–45 min) | Replaces “both when gap is large” for these houses |
 | later | Dual heads first-then-second | House B living |
 | later | Prefer-cool / optional radiant | House A basement |
 | later | Zone averaging of several room sensors | HA mean helper is enough for trial |
 | later | Extra plant types: `switch`, cool-only lock, Crestron floor SP, room-SP-chasing-floor | |
 | later | Closed-room shared cool-only writer | Carrier |
 | later | Weather-compensated floor target + **max floor °F** (hardwood) | House C |
+
+> 1:1 hydronic-first + timed join design: [docs/superpowers/specs/2026-09-14-staging-feature-design.md](../superpowers/specs/2026-09-14-staging-feature-design.md). Dual heads, prefer-cool, and shared cool are still later.
 
 ---
 
@@ -241,7 +242,7 @@ Do **not** implement a new thermostat or a VTherm fork unless the user explicitl
 
 **Priority patch:** with hydronic-first selected, radiator runs before mini-split heat; stock default unchanged for rooms that keep efficiency mode.
 
-**Later 1:1 with timed join:** one user climate; cool = air on, heat plant off; heat = hydronic first, air heat only if still ~2°F short after ~30–45 min; `off` turns both physical plants off.
+**1:1 with timed join (current):** one user climate; cool = air on, heat plant off; heat = hydronic first, air heat only if still ~2°F short after ~30–45 min; `off` turns both physical plants off.
 
 **Open floor:** one first-floor climate drives several radiant plants (hallway can run, kitchen idle) and one unzoned air plant from a single setpoint.
 
@@ -273,6 +274,6 @@ You are in the **repo**. This file is the spec. You cannot and need not load `bc
 2. Merge `upstream/main` into the fork regularly.
 3. Additive options; RoomMind defaults unchanged.
 4. Do not implement VTherm, a from-scratch thermostat, or window-advice.
-5. Do not implement a large hydronic-priority patch until the user has tried stock RoomMind **unless they explicitly ask you to start coding**.
+5. 1:1 hydronic-first + timed join is implemented; do not add dual heads / prefer-cool / shared cool until asked.
 6. Watch upstream PRs #425, #405, #413 — do not duplicate them.
 7. HACS install URL for the house: `https://github.com/Vovixxx/roommind`.

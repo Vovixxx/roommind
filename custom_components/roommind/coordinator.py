@@ -181,6 +181,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._coil_dry_manager = AcCoilDryManager(hass)
         # Heat source orchestration state (per room)
         self._heat_source_states: dict[str, str] = {}
+        self._heat_source_primary_on_since: dict[str, float] = {}
         # Track which rooms already have entity platform entities registered
         self._entity_areas: set[str] = set()
         # Min-run enforcement: timestamp when current non-idle mode started
@@ -807,6 +808,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             and get_trv_eids(room.get("devices", []))
             and get_ac_eids(room.get("devices", []))
         ):
+            now = time.monotonic()
             heat_source_plan = evaluate_heat_sources(
                 room_config=room,
                 mode=mode,
@@ -816,19 +818,30 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 outdoor_temp=self.outdoor_temp_effective,
                 previous_active_sources=self._heat_source_states.get(area_id, "none"),
                 hass=self.hass,
+                now_monotonic=now,
+                primary_on_since=self._heat_source_primary_on_since.get(area_id),
             )
             if heat_source_plan is not None:
                 self._heat_source_states[area_id] = heat_source_plan.active_sources
+                stage1_on = heat_source_plan.active_sources in ("primary", "both")
+                if room.get("heat_source_policy") == "air_first":
+                    stage1_on = heat_source_plan.active_sources in ("secondary", "both")
+                if stage1_on:
+                    self._heat_source_primary_on_since.setdefault(area_id, now)
+                else:
+                    self._heat_source_primary_on_since.pop(area_id, None)
             else:
                 # Orchestrator returned None (e.g. missing current/target temp).
                 # The non-orchestrated async_apply path commands all devices,
                 # so clear stale state to prevent the master-demand filter
                 # from acting on a previous orchestration decision.
                 self._heat_source_states.pop(area_id, None)
+                self._heat_source_primary_on_since.pop(area_id, None)
         else:
             # Orchestration not active for this room — remove stale state
             # so re-enabling starts fresh.
             self._heat_source_states.pop(area_id, None)
+            self._heat_source_primary_on_since.pop(area_id, None)
 
         # Compressor group constraints
         all_device_eids = get_all_entity_ids(room.get("devices", []))
@@ -1880,6 +1893,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._climate_entity_areas.discard(area_id)
         self._model_manager.remove_room(area_id)
         self._heat_source_states.pop(area_id, None)
+        self._heat_source_primary_on_since.pop(area_id, None)
         self._coil_dry_manager.remove_room(area_id)
         if self._history_store:
             await self.hass.async_add_executor_job(self._history_store.remove_room, area_id)

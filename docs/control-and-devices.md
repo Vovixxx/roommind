@@ -173,10 +173,20 @@ The single exception is `Low` on thermostats: it stays active because the affect
 - at least one `Climate Device` / AC
 - an external temperature sensor
 
-In that case RoomMind can decide which source should heat:
+When enabled, RoomMind picks which heat plant(s) run. Choose a **source priority** policy in the heat-source settings for that room.
 
-- TRV / boiler side
-- AC / heat pump side
-- or both, when the gap is large
+### Efficiency (default)
 
-It uses temperature gap and outdoor conditions to make that choice.
+Unchanged from stock RoomMind: uses temperature gap and outdoor conditions. When the gap is large, both plants may run. In mild weather the heat pump is preferred; when it is colder, the boiler / TRV side is preferred.
+
+### Hydronic first
+
+For townhouse-style 1:1 rooms: radiators (TRV / boiler) run immediately. Air heat joins only after the configured hold time if the room is still short of the heat target by at least the join shortfall. Stage 2 drops when the room closes within the drop hysteresis. Outdoor prefer-AC logic is ignored. The AC minimum outdoor temperature still protects the compressor.
+
+### Air first
+
+Reverses plant order for heating: climate devices run first; thermostats join on the same timed shortfall / hold / hysteresis rules.
+
+### Priority slider
+
+The comfort vs efficiency **Priority** slider (`Settings → Control → Priority`) only changes how aggressively MPC works. It does **not** pick hydronic vs air — that is the source priority policy above.
