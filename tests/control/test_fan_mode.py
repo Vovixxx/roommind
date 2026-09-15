@@ -995,6 +995,24 @@ async def test_async_idle_device_setback_redundancy():
     hass.services.async_call.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_async_idle_device_setback_cache_when_temperature_unreported():
+    """IR device in heat with no temperature attribute: second setback is skipped (#416)."""
+    clear_command_cache()
+    hass = build_hass()
+    state = MagicMock()
+    state.state = "heat"
+    state.attributes = {"hvac_modes": ["heat", "off"], "min_temp": 5.0, "max_temp": 30.0, "temperature": None}
+    hass.states.get = MagicMock(return_value=state)
+    devices = [
+        {"entity_id": "climate.ac1", "type": "ac", "role": "auto", "idle_action": "setback", "idle_fan_mode": ""}
+    ]
+    targets = TargetTemps(heat=21.0, cool=None)
+    await async_idle_device(hass, "climate.ac1", devices, area_id="living_room", targets=targets)
+    await async_idle_device(hass, "climate.ac1", devices, area_id="living_room", targets=targets)
+    assert hass.services.async_call.call_count == 1
+
+
 # ---------------------------------------------------------------------------
 # async_apply integration tests with setback idle_action
 # ---------------------------------------------------------------------------
