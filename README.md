@@ -4,14 +4,14 @@
 
 | Name                                                               |    Stmts |     Miss |   Cover |   Missing |
 |------------------------------------------------------------------- | -------: | -------: | ------: | --------: |
-| custom\_components/roommind/\_\_init\_\_.py                        |      107 |       83 |     22% |32-34, 40-61, 66-67, 73-111, 116-125, 130-153, 158-196 |
+| custom\_components/roommind/\_\_init\_\_.py                        |      116 |       79 |     32% |32-34, 40-61, 66-67, 73-111, 122, 135-136, 144-167, 172-210 |
 | custom\_components/roommind/binary\_sensor.py                      |       37 |        0 |    100% |           |
 | custom\_components/roommind/climate.py                             |      133 |        0 |    100% |           |
 | custom\_components/roommind/config\_flow.py                        |       11 |       11 |      0% |      3-23 |
 | custom\_components/roommind/const.py                               |      125 |        0 |    100% |           |
 | custom\_components/roommind/control/\_\_init\_\_.py                |        0 |        0 |    100% |           |
 | custom\_components/roommind/control/analytics\_simulator.py        |      207 |        2 |     99% |    53, 85 |
-| custom\_components/roommind/control/mpc\_controller.py             |      910 |       54 |     94% |162-163, 169-170, 475-477, 495-496, 530-533, 544-551, 564-565, 610, 917-919, 1141, 1227-1239, 1336-1337, 1352, 1635-1636, 1668-1669, 1706, 1713-1714, 1724-1725, 1729-1730, 1870, 1872, 1886, 1891, 1896 |
+| custom\_components/roommind/control/mpc\_controller.py             |      934 |       54 |     94% |134, 137-138, 208-209, 215-216, 541-542, 576-579, 590-597, 610-611, 656, 963-965, 1187, 1273-1285, 1382-1383, 1398, 1681-1682, 1714-1715, 1752, 1759-1760, 1770-1771, 1775-1776, 1932, 1934, 1948, 1953, 1958 |
 | custom\_components/roommind/control/mpc\_optimizer.py              |      211 |        0 |    100% |           |
 | custom\_components/roommind/control/residual\_heat.py              |       24 |        0 |    100% |           |
 | custom\_components/roommind/control/solar.py                       |       81 |        1 |     99% |        72 |
@@ -46,7 +46,7 @@
 | custom\_components/roommind/utils/sensor\_utils.py                 |       29 |        1 |     97% |        25 |
 | custom\_components/roommind/utils/temp\_utils.py                   |       26 |        0 |    100% |           |
 | custom\_components/roommind/websocket\_api.py                      |      297 |        2 |     99% |   736-741 |
-| **TOTAL**                                                          | **6171** |  **258** | **96%** |           |
+| **TOTAL**                                                          | **6204** |  **254** | **96%** |           |
 
 
 ## Setup coverage badge
