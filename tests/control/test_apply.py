@@ -1722,6 +1722,133 @@ async def test_managed_auto_heat_cool_single_setpoint():
 
 
 @pytest.mark.asyncio
+async def test_full_control_range_heat_does_not_collapse_from_stale_high():
+    """Full Control heat intent must not collapse the band when device high is stale.
+
+    Override heat=21 / cool=24, device still reporting target_temp_high=20.
+    max(21, 20)=21 would make a single-point band and the AC cycles (#419).
+    """
+    hass = build_hass()
+    ac_state = MagicMock()
+    ac_state.state = "heat_cool"
+    ac_state.attributes = {
+        "hvac_modes": ["heat_cool", "off"],
+        "target_temp_low": 20.0,
+        "target_temp_high": 20.0,
+        "min_temp": 16.0,
+        "max_temp": 30.0,
+    }
+    hass.states.get = MagicMock(return_value=ac_state)
+
+    room = make_room(thermostats=[], acs=["climate.ac"], climate_mode="auto")
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=5.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    ctrl._idle_targets = TargetTemps(heat=21.0, cool=24.0)
+    await ctrl._call(
+        "set_temperature",
+        {"entity_id": "climate.ac", "temperature": 21.0},
+        temp_intent="heat",
+    )
+
+    call_data = hass.services.async_call.call_args[0][2]
+    assert call_data["target_temp_low"] == 21.0
+    assert call_data["target_temp_high"] == 24.0
+
+
+@pytest.mark.asyncio
+async def test_full_control_range_cool_does_not_collapse_from_stale_low():
+    """Full Control cool intent must not collapse the band when device low is stale.
+
+    Cool target 21 with leftover target_temp_low=22. min(21, 22)=21 collapses
+    the band; park the unused heat side on the resolved heat target instead.
+    """
+    hass = build_hass()
+    ac_state = MagicMock()
+    ac_state.state = "cool"
+    ac_state.attributes = {
+        "hvac_modes": ["heat_cool", "cool", "off"],
+        "target_temp_low": 22.0,
+        "target_temp_high": 23.0,
+        "min_temp": 16.0,
+        "max_temp": 30.0,
+    }
+    hass.states.get = MagicMock(return_value=ac_state)
+
+    room = make_room(thermostats=[], acs=["climate.ac"], climate_mode="auto")
+    room["devices"] = [
+        {
+            "entity_id": "climate.ac",
+            "type": "ac",
+            "role": "auto",
+            "heating_system_type": "",
+            "setpoint_mode": "direct",
+        }
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=30.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    await ctrl.async_apply(
+        "cooling",
+        TargetTemps(heat=19.0, cool=21.0),
+        power_fraction=1.0,
+        current_temp=26.0,
+    )
+
+    temp_calls = [c for c in hass.services.async_call.call_args_list if c[0][1] == "set_temperature"]
+    assert temp_calls
+    last_data = temp_calls[-1][0][2]
+    assert last_data["target_temp_high"] == 21.0
+    assert last_data["target_temp_low"] == 19.0
+
+
+@pytest.mark.asyncio
+async def test_range_cool_parks_unused_heat_on_min_when_no_heat_target():
+    """Cool-only override: unused low side parks on device min, not a collapsed 21/21."""
+    hass = build_hass()
+    ac_state = MagicMock()
+    ac_state.state = "cool"
+    ac_state.attributes = {
+        "hvac_modes": ["heat_cool", "cool", "off"],
+        "target_temp_low": 22.0,
+        "target_temp_high": 20.0,
+        "min_temp": 16.0,
+        "max_temp": 30.0,
+    }
+    hass.states.get = MagicMock(return_value=ac_state)
+
+    room = make_room(thermostats=[], acs=["climate.ac"])
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=30.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    ctrl._idle_targets = TargetTemps(heat=None, cool=21.0)
+    await ctrl._call(
+        "set_temperature",
+        {"entity_id": "climate.ac", "temperature": 21.0},
+        temp_intent="cool",
+    )
+
+    call_data = hass.services.async_call.call_args[0][2]
+    assert call_data["target_temp_high"] == 21.0
+    assert call_data["target_temp_low"] == 16.0
+
+
+@pytest.mark.asyncio
 async def test_turn_off_dual_setpoint_heat_only():
     """Heat-only device with dual-setpoint and no 'off' mode uses both low/high = min_temp."""
     hass = build_hass()

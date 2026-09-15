@@ -98,6 +98,37 @@ def _snap_to_step(value: float, step: float | None) -> float:
     return round(round(value / step) * step, 2)
 
 
+def _inactive_range_bound(
+    commanded: float,
+    *,
+    reported: float | None,
+    resolved: float | None,
+    park: float | None,
+    above: bool,
+) -> float:
+    """Pick the unused side of a dual setpoint without collapsing the band.
+
+    Heat intent needs a high bound above the commanded low; cool intent needs a
+    low bound below the commanded high. Prefer the resolved room target, then
+    the device's current unused side, then min/max. Never reuse a stale
+    attribute that would collapse the band to a single point (#419).
+    """
+
+    def _keeps_band(value: float | None) -> bool:
+        if value is None:
+            return False
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return False
+        return number > commanded if above else number < commanded
+
+    for candidate in (resolved, reported, park):
+        if candidate is not None and _keeps_band(candidate):
+            return float(candidate)
+    return commanded
+
+
 def clear_command_cache() -> None:
     """Clear the sent-command cache (for tests)."""
     _last_commands.clear()
@@ -1849,17 +1880,33 @@ class MPCController:
             and state.attributes.get("target_temp_low") is not None
         ):
             temp = data["temperature"]
-            dev_max = state.attributes.get("max_temp", temp)
-            dev_min = state.attributes.get("min_temp", temp)
+            park_max = state.attributes.get("max_temp")
+            park_min = state.attributes.get("min_temp")
+            resolved_heat = resolved_cool = None
+            if self._idle_targets is not None:
+                if self._idle_targets.heat is not None:
+                    resolved_heat = celsius_to_ha_temp(self.hass, self._idle_targets.heat)
+                if self._idle_targets.cool is not None:
+                    resolved_cool = celsius_to_ha_temp(self.hass, self._idle_targets.cool)
             if temp_intent == "heat":
-                cur_high = state.attributes.get("target_temp_high", dev_max)
                 data = {k: v for k, v in data.items() if k != "temperature"}
                 data["target_temp_low"] = temp
-                data["target_temp_high"] = max(temp, cur_high)
+                data["target_temp_high"] = _inactive_range_bound(
+                    temp,
+                    reported=state.attributes.get("target_temp_high"),
+                    resolved=resolved_cool,
+                    park=park_max,
+                    above=True,
+                )
             elif temp_intent == "cool":
-                cur_low = state.attributes.get("target_temp_low", dev_min)
                 data = {k: v for k, v in data.items() if k != "temperature"}
-                data["target_temp_low"] = min(temp, cur_low)
+                data["target_temp_low"] = _inactive_range_bound(
+                    temp,
+                    reported=state.attributes.get("target_temp_low"),
+                    resolved=resolved_heat,
+                    park=park_min,
+                    above=False,
+                )
                 data["target_temp_high"] = temp
 
         # Clamp dual-setpoint data to device min/max
