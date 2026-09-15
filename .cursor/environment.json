@@ -1,0 +1,11 @@
+{
+  "name": "RoomMind",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "Home Assistant",
+      "command": "source .venv/bin/activate && hass --config /config"
+    }
+  ],
+  "ports": [8123]
+}
