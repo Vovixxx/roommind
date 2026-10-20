@@ -508,12 +508,16 @@ export class RsDeviceSection extends LitElement {
       return !idAfterDot.startsWith("roommind_");
     });
 
-    const areaClimateEntities = allAreaEntities.filter(
-      (e) => e.entity_id.startsWith("climate.") || e.entity_id.startsWith("switch."),
-    );
+    const areaClimateEntities = allAreaEntities.filter((e) => e.entity_id.startsWith("climate."));
     const areaClimateIds = new Set(areaClimateEntities.map((e) => e.entity_id));
+    const areaEntityIds = new Set(allAreaEntities.map((e) => e.entity_id));
+    const selectedSwitchIds = this.devices
+      .filter((d) => d.type === "switch")
+      .map((d) => d.entity_id);
     const allSelectedClimate = new Set(this.devices.map((d) => d.entity_id));
-    const externalClimateIds = [...allSelectedClimate].filter((id) => !areaClimateIds.has(id));
+    const externalClimateIds = [...allSelectedClimate].filter(
+      (id) => !areaClimateIds.has(id) && !selectedSwitchIds.includes(id),
+    );
 
     const inRoom = (id: string) => allSelectedClimate.has(id);
     const detailId = this._selectedForEdit;
@@ -532,6 +536,7 @@ export class RsDeviceSection extends LitElement {
                     ${localize("devices.no_climate", this.hass.language)}
                   </div>`
             }
+            ${selectedSwitchIds.map((id) => this._renderMasterRow(id, !areaEntityIds.has(id)))}
             ${externalClimateIds.map((id) => this._renderMasterRow(id, true))}
           </div>
           <div class="entity-picker-wrap">
@@ -561,18 +566,21 @@ export class RsDeviceSection extends LitElement {
   }
 
   private _renderMasterRow(entityId: string, external: boolean) {
+    const device = this.devices.find((d) => d.entity_id === entityId);
     const isThermostat = this._selectedThermostats.has(entityId);
     const isAc = this._selectedCoolingDevices.has(entityId);
-    const isInRoom = isThermostat || isAc;
+    const isSwitch = device?.type === "switch";
+    const isInRoom = isThermostat || isAc || !!isSwitch;
     const isFocused = this._selectedForEdit === entityId;
     const entityState = this.hass.states[entityId];
     const friendlyName = (entityState?.attributes?.friendly_name as string) || entityId;
-    const device = this.devices.find((d) => d.entity_id === entityId);
-    const typeLabel = isThermostat
-      ? localize("devices.type_thermostat", this.hass.language)
-      : isAc
-        ? localize("devices.type_ac", this.hass.language)
-        : "";
+    const typeLabel = isSwitch
+      ? localize("devices.type_switch", this.hass.language)
+      : isThermostat
+        ? localize("devices.type_thermostat", this.hass.language)
+        : isAc
+          ? localize("devices.type_ac", this.hass.language)
+          : "";
 
     return html`
       <div
