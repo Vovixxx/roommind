@@ -8,12 +8,14 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, VACATION_SENTINEL_UNTIL
 from .coordinator import RoomMindCoordinator
 from .deprecation import warn_deprecated_use
+from .entity import room_device_info, room_device_name
 
 
 def _create_room_switches(
@@ -49,6 +51,7 @@ async def async_setup_entry(
 
 
 class RoomMindCoverAutoSwitch(CoordinatorEntity, SwitchEntity):
+    _attr_entity_category = EntityCategory.CONFIG
     """Switch to toggle automatic cover control per room."""
 
     _attr_has_entity_name = True
@@ -60,6 +63,11 @@ class RoomMindCoverAutoSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_name = f"{area_id} Cover Auto"
         self._attr_icon = "mdi:blinds-horizontal"
         self.entity_id = f"switch.{DOMAIN}_{area_id}_cover_auto"
+
+    @property
+    def device_info(self):
+        """Attach this switch to the zone device."""
+        return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
     @property
     def is_on(self) -> bool:
@@ -83,6 +91,7 @@ class RoomMindCoverAutoSwitch(CoordinatorEntity, SwitchEntity):
 
 class RoomMindClimateControlSwitch(CoordinatorEntity, SwitchEntity):
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: RoomMindCoordinator, area_id: str) -> None:
         super().__init__(coordinator)
@@ -91,6 +100,11 @@ class RoomMindClimateControlSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_name = f"{area_id} Climate Control"
         self._attr_icon = "mdi:thermostat"
         self.entity_id = f"switch.{DOMAIN}_{area_id}_climate_control"
+
+    @property
+    def device_info(self):
+        """Attach this switch to the zone device."""
+        return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
     @property
     def is_on(self) -> bool:
@@ -122,6 +136,16 @@ class RoomMindVacationSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_name = "Vacation Mode"
         self._attr_icon = "mdi:beach"
         self.entity_id = f"switch.{DOMAIN}_vacation"
+
+    @property
+    def device_info(self):
+        """House-level switch, separate from a zone device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, "hub")},
+            name="RoomMind",
+            manufacturer="RoomMind",
+            model="House",
+        )
 
     @property
     def is_on(self) -> bool:

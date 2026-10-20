@@ -365,3 +365,72 @@ class TestEvaluateHeatSources:
 
         assert isinstance(result, HeatSourcePlan)
         assert result.active_sources == "primary"
+
+    def test_primary_preference_keeps_floor_in_mild_weather(self):
+        """Floor-first ignores a mild outdoor temperature until the gap is large."""
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(primary_delta=1.5, outdoor_threshold=5.0)
+        room["heat_source_preference"] = "primary"
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.7, 19.0, 21.0, 12.0, "none", hass)
+
+        assert result is not None
+        assert result.active_sources == "primary"
+        assert result.commands[0].active
+        assert not result.commands[1].active
+
+    def test_primary_preference_large_gap_still_adds_backup(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(primary_delta=1.5)
+        room["heat_source_preference"] = "primary"
+        room["heat_source_large_gap_multiplier"] = 2.0
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, 12.0, "none", hass)
+
+        assert result is not None
+        assert result.active_sources == "both"
+
+    def test_raised_multiplier_holds_the_backup_off(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(primary_delta=1.5)
+        room["heat_source_preference"] = "primary"
+        room["heat_source_large_gap_multiplier"] = 4.0
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, 12.0, "none", hass)
+
+        assert result is not None
+        assert result.active_sources == "primary"
+
+    def test_secondary_power_scale_is_configurable(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(primary_delta=1.5)
+        room["heat_source_secondary_power_scale"] = 0.4
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, 10.0, "none", hass)
+
+        assert result is not None
+        ac_cmds = [c for c in result.commands if c.device_type == "ac"]
+        assert ac_cmds[0].power_fraction == 0.32
+
+    def test_role_swap_makes_the_floor_the_backup(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room()
+        room["devices"] = [
+            {"entity_id": "climate.trv_1", "type": "trv", "role": "secondary", "heating_system_type": ""},
+            {"entity_id": "climate.ac_1", "type": "ac", "role": "primary", "heating_system_type": "heat_pump"},
+        ]
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.7, 19.0, 21.0, -5.0, "none", hass)
+
+        assert result is not None
+        assert result.active_sources == "primary"
+        ac_cmds = [c for c in result.commands if c.entity_id == "climate.ac_1"]
+        trv_cmds = [c for c in result.commands if c.entity_id == "climate.trv_1"]
+        assert ac_cmds[0].active
+        assert ac_cmds[0].role == "primary"
+        assert not trv_cmds[0].active
+
+    def test_cool_only_device_is_left_out_of_heating(self):
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room()
+        room["devices"] = [
+            {"entity_id": "climate.trv_1", "type": "trv", "role": "primary", "heating_system_type": "underfloor"},
+            {"entity_id": "climate.ac_1", "type": "ac", "role": "cool_only", "heating_system_type": ""},
+        ]
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, 12.0, "none", hass)
+        assert result is None

@@ -14,8 +14,12 @@ from .const import (
     DEFAULT_ECO_COOL,
     DEFAULT_ECO_HEAT,
     DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR,
+    DEFAULT_HEAT_SOURCE_HYSTERESIS,
+    DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER,
     DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD,
+    DEFAULT_HEAT_SOURCE_PREFERENCE,
     DEFAULT_HEAT_SOURCE_PRIMARY_DELTA,
+    DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE,
     DOMAIN,
 )
 from .utils.device_utils import (
@@ -287,6 +291,14 @@ class RoomMindStore:
                 "heat_source_outdoor_threshold", DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD
             ),
             "heat_source_ac_min_outdoor": config.get("heat_source_ac_min_outdoor", DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR),
+            "heat_source_hysteresis": config.get("heat_source_hysteresis", DEFAULT_HEAT_SOURCE_HYSTERESIS),
+            "heat_source_large_gap_multiplier": config.get(
+                "heat_source_large_gap_multiplier", DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER
+            ),
+            "heat_source_secondary_power_scale": config.get(
+                "heat_source_secondary_power_scale", DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE
+            ),
+            "heat_source_preference": config.get("heat_source_preference", DEFAULT_HEAT_SOURCE_PREFERENCE),
             "climate_control_enabled": config.get("climate_control_enabled", True),
         }
         _single_temps_to_cool_side(room, config, room["climate_mode"])

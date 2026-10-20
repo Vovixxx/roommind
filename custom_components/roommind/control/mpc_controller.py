@@ -1486,6 +1486,10 @@ class MPCController:
             )
             if sources == "secondary":
                 system = ""
+                for device in self.room_config.get("devices", []):
+                    if device.get("type") == "ac" and device.get("heating_system_type") == "heat_pump":
+                        system = "heat_pump"
+                        break
         self._run_system = system
         return system
 

@@ -93,6 +93,10 @@ export class RsRoomDetail extends LitElement {
   @state() private _heatSourcePrimaryDelta = 1.5;
   @state() private _heatSourceOutdoorThreshold = 5.0;
   @state() private _heatSourceAcMinOutdoor = -15.0;
+  @state() private _heatSourceHysteresis = 0.3;
+  @state() private _heatSourceLargeGapMultiplier = 2;
+  @state() private _heatSourceSecondaryPowerScale = 0.7;
+  @state() private _heatSourcePreference: "outdoor" | "primary" = "outdoor";
   @state() private _optimisticCoverResume = false;
 
   private _prevAreaId: string | null = null;
@@ -296,6 +300,10 @@ export class RsRoomDetail extends LitElement {
       this._heatSourcePrimaryDelta = this.config.heat_source_primary_delta ?? 1.5;
       this._heatSourceOutdoorThreshold = this.config.heat_source_outdoor_threshold ?? 5.0;
       this._heatSourceAcMinOutdoor = this.config.heat_source_ac_min_outdoor ?? -15.0;
+      this._heatSourceHysteresis = this.config.heat_source_hysteresis ?? 0.3;
+      this._heatSourceLargeGapMultiplier = this.config.heat_source_large_gap_multiplier ?? 2;
+      this._heatSourceSecondaryPowerScale = this.config.heat_source_secondary_power_scale ?? 0.7;
+      this._heatSourcePreference = this.config.heat_source_preference ?? "outdoor";
     } else {
       this._devices = [];
       this._selectedTempSensor = "";
@@ -336,6 +344,10 @@ export class RsRoomDetail extends LitElement {
       this._heatSourcePrimaryDelta = 1.5;
       this._heatSourceOutdoorThreshold = 5.0;
       this._heatSourceAcMinOutdoor = -15.0;
+      this._heatSourceHysteresis = 0.3;
+      this._heatSourceLargeGapMultiplier = 2;
+      this._heatSourceSecondaryPowerScale = 0.7;
+      this._heatSourcePreference = "outdoor";
     }
     this._dirty = false;
 
@@ -612,6 +624,10 @@ export class RsRoomDetail extends LitElement {
                     .primaryDelta=${this._heatSourcePrimaryDelta}
                     .outdoorThreshold=${this._heatSourceOutdoorThreshold}
                     .acMinOutdoor=${this._heatSourceAcMinOutdoor}
+                    .hysteresis=${this._heatSourceHysteresis}
+                    .largeGapMultiplier=${this._heatSourceLargeGapMultiplier}
+                    .secondaryPowerScale=${this._heatSourceSecondaryPowerScale}
+                    .preference=${this._heatSourcePreference}
                     @setting-changed=${this._onHeatSourceSettingChanged}
                   ></rs-heat-source-section>
                 </rs-section-card>`
@@ -889,6 +905,10 @@ export class RsRoomDetail extends LitElement {
             .primaryDelta=${this._heatSourcePrimaryDelta}
             .outdoorThreshold=${this._heatSourceOutdoorThreshold}
             .acMinOutdoor=${this._heatSourceAcMinOutdoor}
+            .hysteresis=${this._heatSourceHysteresis}
+            .largeGapMultiplier=${this._heatSourceLargeGapMultiplier}
+            .secondaryPowerScale=${this._heatSourceSecondaryPowerScale}
+            .preference=${this._heatSourcePreference}
             @setting-changed=${this._onHeatSourceSettingChanged}
           ></rs-heat-source-section>
         </rs-edit-dialog>`;
@@ -1073,6 +1093,13 @@ export class RsRoomDetail extends LitElement {
     else if (key === "heat_source_outdoor_threshold")
       this._heatSourceOutdoorThreshold = value as number;
     else if (key === "heat_source_ac_min_outdoor") this._heatSourceAcMinOutdoor = value as number;
+    else if (key === "heat_source_hysteresis") this._heatSourceHysteresis = value as number;
+    else if (key === "heat_source_large_gap_multiplier")
+      this._heatSourceLargeGapMultiplier = value as number;
+    else if (key === "heat_source_secondary_power_scale")
+      this._heatSourceSecondaryPowerScale = value as number;
+    else if (key === "heat_source_preference" && (value === "outdoor" || value === "primary"))
+      this._heatSourcePreference = value;
     this._autoSave();
   }
 
@@ -1148,6 +1175,10 @@ export class RsRoomDetail extends LitElement {
         heat_source_primary_delta: this._heatSourcePrimaryDelta,
         heat_source_outdoor_threshold: this._heatSourceOutdoorThreshold,
         heat_source_ac_min_outdoor: this._heatSourceAcMinOutdoor,
+        heat_source_hysteresis: this._heatSourceHysteresis,
+        heat_source_large_gap_multiplier: this._heatSourceLargeGapMultiplier,
+        heat_source_secondary_power_scale: this._heatSourceSecondaryPowerScale,
+        heat_source_preference: this._heatSourcePreference,
       });
 
       this._dirty = false;

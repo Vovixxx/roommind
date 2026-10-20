@@ -5,11 +5,13 @@ from __future__ import annotations
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import RoomMindCoordinator
+from .entity import room_device_info, room_device_name
 
 
 def _create_room_binary_sensors(
@@ -43,6 +45,7 @@ class RoomMindCoverPausedSensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor indicating if cover auto-control is paused by user override."""
 
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator: RoomMindCoordinator, area_id: str) -> None:
         super().__init__(coordinator)
@@ -51,6 +54,11 @@ class RoomMindCoverPausedSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_name = f"{area_id} Cover Paused"
         self._attr_icon = "mdi:hand-back-right"
         self.entity_id = f"binary_sensor.{DOMAIN}_{area_id}_cover_paused"
+
+    @property
+    def device_info(self):
+        """Attach this sensor to the zone device."""
+        return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
     @property
     def is_on(self) -> bool:

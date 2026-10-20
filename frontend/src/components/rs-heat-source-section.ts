@@ -13,6 +13,10 @@ export class RsHeatSourceSection extends LitElement {
   @property({ type: Number }) public primaryDelta = 1.5;
   @property({ type: Number }) public outdoorThreshold = 5.0;
   @property({ type: Number }) public acMinOutdoor = -15.0;
+  @property({ type: Number }) public hysteresis = 0.3;
+  @property({ type: Number }) public largeGapMultiplier = 2.0;
+  @property({ type: Number }) public secondaryPowerScale = 0.7;
+  @property() public preference: "outdoor" | "primary" = "outdoor";
   @property({ type: Boolean }) public editing = false;
 
   static styles = [
@@ -79,7 +83,7 @@ export class RsHeatSourceSection extends LitElement {
       .thresholds {
         margin-top: 16px;
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 12px;
       }
 
@@ -138,6 +142,17 @@ export class RsHeatSourceSection extends LitElement {
         >
         · ${localize("heat_source.ac_min_outdoor", lang)}:
         <strong>${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong>
+        · ${localize("heat_source.preference", lang)}:
+        <strong
+          >${localize(
+            this.preference === "primary"
+              ? "heat_source.preference_primary"
+              : "heat_source.preference_outdoor",
+            lang,
+          )}</strong
+        >
+        · ${localize("heat_source.large_gap_multiplier", lang)}:
+        <strong>${this.largeGapMultiplier}×</strong>
       </div>`;
     }
 
@@ -154,6 +169,32 @@ export class RsHeatSourceSection extends LitElement {
         this.enabled
           ? html`
               <div class="thresholds">
+                <div class="threshold-cell">
+                  <div class="threshold-label">
+                    <span>${localize("heat_source.preference", lang)}</span>
+                    <rs-info-icon
+                      .text=${localize("heat_source.preference_hint", lang)}
+                    ></rs-info-icon>
+                  </div>
+                  <ha-select
+                    .value=${this.preference}
+                    @selected=${(e: Event) => {
+                      const target = e.target as HTMLElement & { value?: string };
+                      if (target.value === "outdoor" || target.value === "primary") {
+                        this._emit("heat_source_preference", target.value);
+                      }
+                    }}
+                    @closed=${(e: Event) => e.stopPropagation()}
+                    fixedMenuPosition
+                  >
+                    <ha-list-item value="outdoor"
+                      >${localize("heat_source.preference_outdoor", lang)}</ha-list-item
+                    >
+                    <ha-list-item value="primary"
+                      >${localize("heat_source.preference_primary", lang)}</ha-list-item
+                    >
+                  </ha-select>
+                </div>
                 ${this._renderThresholdCell({
                   label: localize("heat_source.primary_delta", lang),
                   hint: localize("heat_source.primary_delta_hint", lang),
@@ -183,6 +224,36 @@ export class RsHeatSourceSection extends LitElement {
                   max: 5,
                   step: 1,
                   key: "heat_source_ac_min_outdoor",
+                })}
+                ${this._renderThresholdCell({
+                  label: localize("heat_source.hysteresis", lang),
+                  hint: localize("heat_source.hysteresis_hint", lang),
+                  suffix: localize("heat_source.primary_delta_suffix", lang),
+                  value: this.hysteresis,
+                  min: 0,
+                  max: 2,
+                  step: 0.1,
+                  key: "heat_source_hysteresis",
+                })}
+                ${this._renderThresholdCell({
+                  label: localize("heat_source.large_gap_multiplier", lang),
+                  hint: localize("heat_source.large_gap_multiplier_hint", lang),
+                  suffix: "×",
+                  value: this.largeGapMultiplier,
+                  min: 1,
+                  max: 8,
+                  step: 0.1,
+                  key: "heat_source_large_gap_multiplier",
+                })}
+                ${this._renderThresholdCell({
+                  label: localize("heat_source.secondary_power_scale", lang),
+                  hint: localize("heat_source.secondary_power_scale_hint", lang),
+                  suffix: "",
+                  value: this.secondaryPowerScale,
+                  min: 0.1,
+                  max: 1,
+                  step: 0.05,
+                  key: "heat_source_secondary_power_scale",
                 })}
               </div>
             `

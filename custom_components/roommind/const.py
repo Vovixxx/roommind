@@ -169,6 +169,12 @@ HEATING_SYSTEM_PROFILES: dict[str, dict[str, float]] = {
         "tau_charge_minutes": 60.0,
         "min_run_minutes": 30.0,
     },
+    "heat_pump": {
+        "tau_minutes": 10.0,
+        "initial_fraction": 0.2,
+        "tau_charge_minutes": 8.0,
+        "min_run_minutes": 15.0,
+    },
 }
 RESIDUAL_HEAT_CUTOFF = 0.02  # below this q_residual is treated as zero
 
@@ -207,9 +213,14 @@ COVER_SMOOTHING_RISE_MINUTES: float = 10.0  # faster EMA while the shading exces
 DEFAULT_HEAT_SOURCE_PRIMARY_DELTA = 1.5  # °C gap to engage primary (boiler/radiator)
 DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD = 5.0  # °C outdoor: above = prefer AC, below = prefer boiler
 DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR = -15.0  # °C hard-disable AC heating below this
-HEAT_SOURCE_HYSTERESIS = 0.3  # °C hysteresis band to prevent oscillation
-HEAT_SOURCE_LARGE_GAP_MULTIPLIER = 2.0  # activate both sources when gap > primary_delta * this
-HEAT_SOURCE_SECONDARY_POWER_SCALE = 0.7  # throttle secondary when both active (prevent overshoot)
+DEFAULT_HEAT_SOURCE_HYSTERESIS = 0.3  # °C hysteresis band to prevent oscillation
+DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER = 2.0  # both sources when gap > primary_delta * this
+DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE = 0.7  # throttle secondary when both are active
+DEFAULT_HEAT_SOURCE_PREFERENCE = "outdoor"  # outdoor | primary
+# Aliases kept for existing imports. Room config overrides these when set.
+HEAT_SOURCE_HYSTERESIS = DEFAULT_HEAT_SOURCE_HYSTERESIS
+HEAT_SOURCE_LARGE_GAP_MULTIPLIER = DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER
+HEAT_SOURCE_SECONDARY_POWER_SCALE = DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE
 
 # Compressor group defaults
 DEFAULT_COMPRESSOR_MIN_RUN_MINUTES = 15
