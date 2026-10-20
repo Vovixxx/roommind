@@ -22,7 +22,7 @@ from homeassistant.core import HomeAssistant
 
 from ..const import (
     DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR,
-DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
     DEFAULT_HEAT_SOURCE_HYSTERESIS,
     DEFAULT_HEAT_SOURCE_JOIN_DELTA,
     DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
@@ -268,7 +268,6 @@ def evaluate_heat_sources(
             active = "primary"
         else:
             active = "primary" if delta_t >= primary_delta + hysteresis else "secondary"
-
 
     # Edge case: if chosen group has no devices, fall back
     if active == "secondary" and not secondary_devices:

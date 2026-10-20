@@ -550,6 +550,7 @@ class TestEvaluateHeatSources:
         result = evaluate_heat_sources(room, MODE_HEATING, 0.7, 19.0, 21.0, 12.0, "none", hass)
         assert result is not None
         assert result.active_sources == "secondary"
+
     def test_primary_preference_keeps_floor_in_mild_weather(self):
         """Floor-first ignores a mild outdoor temperature until the gap is large."""
         hass = _make_hass(["heat", "cool"])

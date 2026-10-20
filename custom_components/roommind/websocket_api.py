@@ -391,9 +391,7 @@ async def websocket_list_rooms(
                     ),
                     vol.Optional("idle_action", default="off"): vol.In(["off", "fan_only", "setback", "low"]),
                     vol.Optional("idle_fan_mode", default="low"): str,
-                    vol.Optional("setpoint_mode", default="proportional"): vol.In(
-                        ["proportional", "direct", "follow"]
-                    ),
+                    vol.Optional("setpoint_mode", default="proportional"): vol.In(["proportional", "direct", "follow"]),
                     vol.Optional("setpoint_offset", default=0.0): vol.All(
                         vol.Coerce(float), vol.Range(min=SETPOINT_OFFSET_MIN, max=SETPOINT_OFFSET_MAX)
                     ),
