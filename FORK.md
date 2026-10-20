@@ -61,7 +61,7 @@ Upstream RoomMind is unchanged when the new options are left at their defaults. 
 | Follow | Shifts the room error into the device's own sensor, then adds the same setpoint offset Direct uses. | Proportional devices ignore the offset. |
 | One zone device | The room climate and its helpers share one Home Assistant device. The old override climate is no longer created. Holds stay on the zone climate. | |
 | Heat switch | `switch` can be an electric heater, radiant floor, radiator, or boiler. It is turned on and off. It is not sent climate services. | A room with no switch never calls `switch.turn_on`. |
-| Boiler profile | A boiler switch holds on for 10 minutes. A heat-pump backup uses the 15 minute profile instead of the floor's 30. | The compressor group is still the shared outdoor-unit lock. It is not replaced by the boiler profile. |
+| Boiler profile | A boiler switch holds on for 10 minutes. Heat-pump heat stores about as little as an electric heater, and holds 15 minutes so the compressor does not short-cycle, instead of the floor's 30. | The compressor group is still the shared outdoor-unit lock. Cooling is the learned cooling rate, not this profile. |
 | Unit | The zone climate, target sensor, heat-source card, and cover thresholds follow Celsius or Fahrenheit. Storage stays Celsius. | |
 
 Heating behaviour is set on each device. The old room-wide "Heating system type" control wrote the same field onto every thermostat, so it is gone. A stored primary or backup role is ignored. The orchestrator is the only staging decision. A thermostat or heat switch is the plant. A climate that can heat is the backup. Cool-only still keeps a climate out of heating. Air first is the policy that runs the backup first.
