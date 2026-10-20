@@ -317,19 +317,28 @@ export class RsDeviceSection extends LitElement {
       /* View mode styles */
       .view-row {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 10px;
+        column-gap: 10px;
+        row-gap: 4px;
         padding: 8px 14px;
         font-size: 14px;
         color: var(--primary-text-color);
       }
 
       .view-name {
-        flex: 1;
-        min-width: 0;
+        flex: 1 1 auto;
+        min-width: 8rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .view-badges {
+        flex: 1 0 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
       }
 
       .entity-link {
@@ -343,6 +352,7 @@ export class RsDeviceSection extends LitElement {
       .view-value {
         font-weight: 500;
         flex-shrink: 0;
+        margin-left: auto;
       }
     `,
   ];
@@ -436,71 +446,83 @@ export class RsDeviceSection extends LitElement {
       device?.setpoint_mode === "direct" && !!this.selectedTempSensor && !hasValve;
     const showValveBadge = hasValve && !!this.selectedTempSensor;
 
+    const badges = html`
+      ${
+        showIdleBadge
+          ? html`<span class="valve-exclude-badge">
+              ${
+                device!.idle_action === "fan_only"
+                  ? html`${localize("devices.idle_action_fan_only", this.hass.language)}${
+                      device!.idle_fan_mode ? ` (${device!.idle_fan_mode})` : nothing
+                    }`
+                  : device!.idle_action === "low"
+                    ? localize("devices.idle_action_low", this.hass.language)
+                    : localize("devices.idle_action_setback", this.hass.language)
+              }
+            </span>`
+          : nothing
+      }
+      ${
+        showFollowBadge
+          ? html`<span class="valve-exclude-badge">
+              ${localize("devices.setpoint_mode_follow", this.hass.language)}
+            </span>`
+          : nothing
+      }
+      ${
+        showDirectBadge
+          ? html`<span class="valve-exclude-badge">
+              ${localize("devices.setpoint_mode_direct", this.hass.language)}
+            </span>`
+          : nothing
+      }
+      ${
+        showValveBadge
+          ? html`<span class="valve-exclude-badge">
+              <ha-icon icon="mdi:valve"></ha-icon>
+              ${localize("devices.valve_direct_badge", this.hass.language)}
+            </span>`
+          : nothing
+      }
+      ${
+        showExcludeBadge
+          ? html`<span class="valve-exclude-badge">
+              <ha-icon icon="mdi:shield-off-outline"></ha-icon>
+              ${localize("devices.valve_protection_excluded", this.hass.language)}
+            </span>`
+          : nothing
+      }
+      ${
+        device && device.role && device.role !== "auto"
+          ? html`<span class="valve-exclude-badge"
+              >${localize(`devices.heat_role_${device.role}`, this.hass.language)}</span
+            >`
+          : nothing
+      }
+      ${
+        device?.heating_system_type === "heat_pump"
+          ? html`<span class="valve-exclude-badge"
+              >${localize("devices.behaviour_heat_pump", this.hass.language)}</span
+            >`
+          : nothing
+      }
+    `;
+    const hasBadges =
+      showIdleBadge ||
+      showFollowBadge ||
+      showDirectBadge ||
+      showValveBadge ||
+      showExcludeBadge ||
+      (device != null && !!device.role && device.role !== "auto") ||
+      device?.heating_system_type === "heat_pump";
+
     return html`
       <div class="view-row">
         <span class="view-name entity-link" @click=${() => openEntityInfo(this, entityId)}
           >${friendlyName}</span
         >
-        ${
-          showIdleBadge
-            ? html`<span class="valve-exclude-badge">
-                ${
-                  device!.idle_action === "fan_only"
-                    ? html`${localize("devices.idle_action_fan_only", this.hass.language)}${
-                        device!.idle_fan_mode ? ` (${device!.idle_fan_mode})` : nothing
-                      }`
-                    : device!.idle_action === "low"
-                      ? localize("devices.idle_action_low", this.hass.language)
-                      : localize("devices.idle_action_setback", this.hass.language)
-                }
-              </span>`
-            : nothing
-        }
-        ${
-          showFollowBadge
-            ? html`<span class="valve-exclude-badge">
-                ${localize("devices.setpoint_mode_follow", this.hass.language)}
-              </span>`
-            : nothing
-        }
-        ${
-          showDirectBadge
-            ? html`<span class="valve-exclude-badge">
-                ${localize("devices.setpoint_mode_direct", this.hass.language)}
-              </span>`
-            : nothing
-        }
-        ${
-          showValveBadge
-            ? html`<span class="valve-exclude-badge">
-                <ha-icon icon="mdi:valve"></ha-icon>
-                ${localize("devices.valve_direct_badge", this.hass.language)}
-              </span>`
-            : nothing
-        }
-        ${
-          showExcludeBadge
-            ? html`<span class="valve-exclude-badge">
-                <ha-icon icon="mdi:shield-off-outline"></ha-icon>
-                ${localize("devices.valve_protection_excluded", this.hass.language)}
-              </span>`
-            : nothing
-        }
-        ${
-          device && device.role && device.role !== "auto"
-            ? html`<span class="valve-exclude-badge"
-                >${localize(`devices.heat_role_${device.role}`, this.hass.language)}</span
-              >`
-            : nothing
-        }
-        ${
-          device?.heating_system_type === "heat_pump"
-            ? html`<span class="valve-exclude-badge"
-                >${localize("devices.behaviour_heat_pump", this.hass.language)}</span
-              >`
-            : nothing
-        }
         ${displayValue ? html`<span class="view-value">${displayValue}</span>` : nothing}
+        ${hasBadges ? html`<span class="view-badges">${badges}</span>` : nothing}
       </div>
     `;
   }
