@@ -202,7 +202,7 @@
   "devices.setpoint_mode_direct": "Direct (device regulates)",
   "devices.setpoint_mode_follow": "Follow (device sensor)",
   "devices.setpoint_offset": "Setpoint offset",
-  "devices.setpoint_offset_hint": "Use this if the device's own sensor reads differently from your room sensor. The offset is added to the room target before it is sent to the device (heating and cooling). Device reads colder than the room: negative value. Device reads warmer: positive value. Example: you want 24°, but while cooling the device thinks the room is 2° colder than it is and stops too early. Enter -2: the device then gets 22° and keeps running until the room is really at 24°. 0 = no offset.",
+  "devices.setpoint_offset_hint": "Added to the command in Direct and Follow. Direct adds it to the room target. Follow adds it after shifting into the device sensor. Device reads colder than the room: negative value. Device reads warmer: positive value. 0 = no offset.",
   "devices.setpoint_mode_hint": "Direct sends the room target — use when the climate temperature is the air you trust. Follow shifts the command so the unit sees the same error as the room — use when current_temperature is return air or a radiator head. Proportional sends a boosted setpoint toward device max_temp — TRV / valve control only.",
   "devices.coil_dry": "Evaporator drying",
   "devices.coil_dry_inherit": "Use global setting",

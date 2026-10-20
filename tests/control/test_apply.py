@@ -4500,6 +4500,38 @@ async def test_follow_setpoint_ac_cooling_when_return_below_target():
 
 
 @pytest.mark.asyncio
+async def test_follow_setpoint_adds_offset():
+    """Follow adds the user offset after the sensor shift: 19 + (-1) = 18."""
+    hass = build_hass()
+    hass.states.get = MagicMock(return_value=_climate_state(21.0, hvac_modes=["cool", "off"]))
+    room = make_room(thermostats=[], acs=["climate.ac"])
+    room["devices"] = [
+        {
+            "entity_id": "climate.ac",
+            "type": "ac",
+            "role": "auto",
+            "heating_system_type": "",
+            "setpoint_mode": "follow",
+            "setpoint_offset": -1.0,
+        }
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=35.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    _last_commands.clear()
+    await ctrl.async_apply("cooling", 22.0, power_fraction=1.0, current_temp=24.0)
+
+    set_temp_calls = [c for c in hass.services.async_call.call_args_list if c[0][1] == "set_temperature"]
+    assert set_temp_calls
+    assert set_temp_calls[0][0][2]["temperature"] == 18.0
+
+
+@pytest.mark.asyncio
 async def test_follow_setpoint_trv_heating_when_head_above_target():
     """Follow TRV: room 20, target 22, head 23 → send 25, not 22 or heat-boost 30."""
     hass = build_hass()

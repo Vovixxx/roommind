@@ -622,6 +622,10 @@ class TestFollowSetpoint:
     def test_rounds_to_one_decimal(self):
         assert follow_setpoint(22.0, 23.3, 21.7) == 20.4
 
+    def test_offset_is_added_before_the_clamp(self):
+        assert follow_setpoint(22.0, 24.0, 21.0, offset=-1.0) == 18.0
+        assert follow_setpoint(22.0, 24.0, 21.0, min_temp=19.0, offset=-2.0) == 19.0
+
 
 class TestGetFollowSetpointEids:
     def test_mixed_devices(self):
@@ -847,6 +851,11 @@ class TestGetSetpointOffsets:
         devices = [{"entity_id": "climate.ac", "type": "ac", "setpoint_mode": "proportional", "setpoint_offset": 2.0}]
         assert get_setpoint_offset(devices, "climate.ac") == 0.0
         assert get_setpoint_offsets(devices) == {}
+
+    def test_follow_device_keeps_offset(self):
+        devices = [{"entity_id": "climate.ac", "type": "ac", "setpoint_mode": "follow", "setpoint_offset": -1.5}]
+        assert get_setpoint_offset(devices, "climate.ac") == -1.5
+        assert get_setpoint_offsets(devices) == {"climate.ac": -1.5}
 
     def test_unknown_device_is_zero(self):
         assert get_setpoint_offset([], "climate.ghost") == 0.0

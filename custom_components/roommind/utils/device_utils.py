@@ -320,10 +320,17 @@ def _is_direct(device: dict) -> bool:
     )
 
 
+def _accepts_setpoint_offset(device: dict) -> bool:
+    """Direct and Follow both add the user's offset. Proportional does not."""
+    if device.get("setpoint_mode") == SETPOINT_MODE_FOLLOW:
+        return True
+    return _is_direct(device)
+
+
 def get_setpoint_offset(devices: list[dict], entity_id: str) -> float:
-    """Return the direct-mode setpoint offset (°C) of a device, 0.0 if unset, invalid or not direct."""
+    """Return the Direct or Follow setpoint offset (°C), else 0.0."""
     dev = get_device_by_eid(devices, entity_id)
-    if dev is None or not _is_direct(dev):
+    if dev is None or not _accepts_setpoint_offset(dev):
         return 0.0
     try:
         offset = float(dev.get("setpoint_offset") or 0.0)
@@ -335,7 +342,7 @@ def get_setpoint_offset(devices: list[dict], entity_id: str) -> float:
 
 
 def get_setpoint_offsets(devices: list[dict]) -> dict[str, float]:
-    """Return {entity_id: offset} for direct-mode devices with a non-zero offset."""
+    """Return {entity_id: offset} for Direct and Follow devices with a non-zero offset."""
     offsets = {d["entity_id"]: get_setpoint_offset(devices, d["entity_id"]) for d in devices if d.get("entity_id")}
     return {eid: off for eid, off in offsets.items() if off}
 
@@ -375,17 +382,19 @@ def follow_setpoint(
     device_temp: float,
     min_temp: float | None = None,
     max_temp: float | None = None,
+    offset: float = 0.0,
 ) -> float:
     """Translate the room error into the device's own sensor frame.
 
     The climate entity regulates against *device_temp* (return air, radiator
     head, …), not the room sensor. Sending *room_target* stalls when that
     reading is already on the far side of the target. Shift the command so
-    the device sees the same error the room still has:
+    the device sees the same error the room still has, then add the user's
+    setpoint offset:
 
-        command = room_target + (device_temp - room_temp)
+        command = room_target + (device_temp - room_temp) + offset
     """
-    command = room_target + (device_temp - room_temp)
+    command = room_target + (device_temp - room_temp) + offset
     if min_temp is not None:
         command = max(min_temp, command)
     if max_temp is not None:

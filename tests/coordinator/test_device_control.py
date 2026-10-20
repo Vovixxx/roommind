@@ -253,6 +253,27 @@ class TestComputeDeviceSetpointOrchestrated:
         )
         assert result == 25.0
 
+    def test_follow_device_adds_offset(self, hass, mock_config_entry):
+        coordinator = _create_coordinator(hass, mock_config_entry)
+        cmd = MagicMock()
+        cmd.active = True
+        cmd.entity_id = "climate.split"
+        cmd.device_type = "ac"
+        cmd.power_fraction = 1.0
+        plan = MagicMock()
+        plan.commands = [cmd]
+        result = coordinator._compute_device_setpoint_orchestrated(
+            plan,
+            20.0,
+            22.0,
+            30.0,
+            28.0,
+            follow_eids={"climate.split"},
+            device_temp=23.0,
+            direct_offsets={"climate.split": -1.0},
+        )
+        assert result == 24.0
+
     def test_direct_device_adds_offset(self, hass, mock_config_entry):
         coordinator = _create_coordinator(hass, mock_config_entry)
         cmd = MagicMock()

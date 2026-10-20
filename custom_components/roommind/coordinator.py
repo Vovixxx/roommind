@@ -1555,7 +1555,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         _direct_offsets = get_setpoint_offsets(_room_devices) if has_external_sensor else {}
         # One shown value only when every driven device agrees on the offset
         _relevant_offsets = {_direct_offsets.get(eid, 0.0) for eid in _mode_relevant_eids}
-        _display_offset = _relevant_offsets.pop() if _all_direct and len(_relevant_offsets) == 1 else 0.0
+        _display_offset = (
+            _relevant_offsets.pop() if (_all_direct or _all_follow) and len(_relevant_offsets) == 1 else 0.0
+        )
         # Same rule for the learned AC sensor offset: shown only when the room's proportional ACs agree
         _head_shift = 0.0
         if has_external_sensor and mode in (MODE_HEATING, MODE_COOLING):
@@ -1694,7 +1696,13 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             if device_temp is None:
                 return target_temp
             max_t = device_max_temp if cmd.device_type == "thermostat" else ac_device_max_temp
-            return follow_setpoint(target_temp, current_temp, device_temp, max_temp=max_t)
+            return follow_setpoint(
+                target_temp,
+                current_temp,
+                device_temp,
+                max_temp=max_t,
+                offset=(direct_offsets or {}).get(cmd.entity_id, 0.0),
+            )
         if direct_eids and cmd.entity_id in direct_eids:
             base = direct_target if direct_target is not None else target_temp
             return base + (direct_offsets or {}).get(cmd.entity_id, 0.0)
@@ -1743,6 +1751,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 device_temp,
                 min_temp=device_min_temp if mode == MODE_COOLING else None,
                 max_temp=device_max_temp if mode == MODE_HEATING else None,
+                offset=direct_offset,
             )
         if all_direct:
             return (direct_target if direct_target is not None else target_temp) + direct_offset

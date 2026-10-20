@@ -2716,16 +2716,17 @@ class MPCController:
 
     def _follow_command(self, eid: str, effective_target: float, current_temp: float | None) -> float:
         """Shift the room target into the climate entity's own sensor frame."""
+        offset = self._direct_offsets.get(eid, 0.0) if self.has_external_sensor else 0.0
         if not self.has_external_sensor or current_temp is None:
-            return effective_target
+            return effective_target + offset
         state = self.hass.states.get(eid)
         raw = None if state is None else state.attributes.get("current_temperature")
         if raw is None:
-            return effective_target
+            return effective_target + offset
         try:
             device_temp = ha_temp_to_celsius(self.hass, float(raw), entity_id=eid)
         except (TypeError, ValueError):
-            return effective_target
+            return effective_target + offset
 
         min_temp: float | None = None
         max_temp: float | None = None
@@ -2742,7 +2743,8 @@ class MPCController:
                     max_temp = ha_temp_to_celsius(self.hass, float(raw_max), entity_id=eid)
                 except (TypeError, ValueError):
                     max_temp = None
-        return follow_setpoint(effective_target, current_temp, device_temp, min_temp, max_temp)
+        offset = self._direct_offsets.get(eid, 0.0) if self.has_external_sensor else 0.0
+        return follow_setpoint(effective_target, current_temp, device_temp, min_temp, max_temp, offset)
 
     def _head_offset(self, eid: str, intent: str) -> float:
         """Learned offset (K) of an AC's own sensor from the room sensor in state *intent*.

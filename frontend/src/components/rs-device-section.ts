@@ -1161,7 +1161,7 @@ export class RsDeviceSection extends LitElement {
                 <rs-info-icon .text=${localize("devices.setpoint_mode_hint", lang)}></rs-info-icon>
               </div>
               ${
-                device.setpoint_mode === "direct"
+                device.setpoint_mode === "direct" || device.setpoint_mode === "follow"
                   ? html`
                       <div class="detail-field with-info">
                         <ha-textfield
