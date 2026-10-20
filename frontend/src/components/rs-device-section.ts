@@ -500,9 +500,9 @@ export class RsDeviceSection extends LitElement {
           : nothing
       }
       ${
-        device?.heating_system_type === "heat_pump"
+        device?.heating_system_type
           ? html`<span class="valve-exclude-badge"
-              >${localize("devices.behaviour_heat_pump", this.hass.language)}</span
+              >${this._behaviourLabel(device.heating_system_type)}</span
             >`
           : nothing
       }
@@ -514,7 +514,7 @@ export class RsDeviceSection extends LitElement {
       showValveBadge ||
       showExcludeBadge ||
       (device != null && !!device.role && device.role !== "auto") ||
-      device?.heating_system_type === "heat_pump";
+      !!device?.heating_system_type;
 
     return html`
       <div class="view-row">
@@ -537,7 +537,9 @@ export class RsDeviceSection extends LitElement {
       return !idAfterDot.startsWith("roommind_");
     });
 
-    const areaClimateEntities = allAreaEntities.filter((e) => e.entity_id.startsWith("climate."));
+    const areaClimateEntities = allAreaEntities.filter(
+      (e) => e.entity_id.startsWith("climate.") || e.entity_id.startsWith("switch."),
+    );
     const areaClimateIds = new Set(areaClimateEntities.map((e) => e.entity_id));
     const allSelectedClimate = new Set(this.devices.map((d) => d.entity_id));
     const externalClimateIds = [...allSelectedClimate].filter((id) => !areaClimateIds.has(id));
@@ -564,7 +566,7 @@ export class RsDeviceSection extends LitElement {
           <div class="entity-picker-wrap">
             <ha-entity-picker
               .hass=${this.hass}
-              .includeDomains=${["climate"]}
+              .includeDomains=${["climate", "switch"]}
               .entityFilter=${this._entityFilter}
               .value=${""}
               label=${localize("devices.add_entity", this.hass.language)}
@@ -756,6 +758,7 @@ export class RsDeviceSection extends LitElement {
 
     const isThermostat = device.type === "trv";
     const isAc = device.type === "ac";
+    const isSwitch = device.type === "switch";
     const entityState = this.hass.states[entityId];
     const friendlyName = (entityState?.attributes?.friendly_name as string) || entityId;
     const hvacModes = (entityState?.attributes?.hvac_modes ?? []) as string[];
@@ -788,9 +791,10 @@ export class RsDeviceSection extends LitElement {
           .options=${[
             { value: "thermostat", label: localize("devices.type_thermostat", lang) },
             { value: "ac", label: localize("devices.type_ac", lang) },
+            { value: "switch", label: localize("devices.type_switch", lang) },
           ]}
           @selected=${(e: Event) =>
-            this._onDeviceTypeChange(entityId, getSelectValue(e) as "thermostat" | "ac")}
+            this._onDeviceTypeChange(entityId, getSelectValue(e) as "thermostat" | "ac" | "switch")}
           @closed=${(e: Event) => e.stopPropagation()}
           fixedMenuPosition
         >
@@ -798,84 +802,80 @@ export class RsDeviceSection extends LitElement {
             >${localize("devices.type_thermostat", lang)}</ha-list-item
           >
           <ha-list-item value="ac">${localize("devices.type_ac", lang)}</ha-list-item>
+          <ha-list-item value="switch">${localize("devices.type_switch", lang)}</ha-list-item>
         </ha-select>
-      </div>
-
-      <div class="detail-field with-info">
-        <ha-select
-          .label=${localize("devices.heat_role", lang)}
-          .value=${device.role ?? "auto"}
-          .options=${[
-            { value: "auto", label: localize("devices.heat_role_auto", lang) },
-            { value: "primary", label: localize("devices.heat_role_primary", lang) },
-            { value: "secondary", label: localize("devices.heat_role_secondary", lang) },
-            { value: "cool_only", label: localize("devices.heat_role_cool_only", lang) },
-          ]}
-          @selected=${(e: Event) => this._onHeatRoleChange(entityId, getSelectValue(e))}
-          @closed=${(e: Event) => e.stopPropagation()}
-          fixedMenuPosition
-        >
-          <ha-list-item value="auto">${localize("devices.heat_role_auto", lang)}</ha-list-item>
-          <ha-list-item value="primary"
-            >${localize("devices.heat_role_primary", lang)}</ha-list-item
-          >
-          <ha-list-item value="secondary"
-            >${localize("devices.heat_role_secondary", lang)}</ha-list-item
-          >
-          <ha-list-item value="cool_only"
-            >${localize("devices.heat_role_cool_only", lang)}</ha-list-item
-          >
-        </ha-select>
-        <rs-info-icon .text=${localize("devices.heat_role_hint", lang)}></rs-info-icon>
       </div>
 
       <div class="detail-field with-info">
         <ha-select
           .label=${localize("devices.behaviour", lang)}
-          .value=${device.heating_system_type || "standard"}
-          .options=${[
-            { value: "standard", label: localize("devices.behaviour_standard", lang) },
-            ...(isThermostat
+          .value=${isSwitch ? device.heating_system_type || "electric" : device.heating_system_type || "standard"}
+          .options=${
+            isSwitch
               ? [
+                  { value: "electric", label: localize("devices.system_type_electric", lang) },
+                  { value: "underfloor", label: localize("devices.system_type_radiant", lang) },
                   { value: "radiator", label: localize("devices.system_type_radiator", lang) },
-                  { value: "underfloor", label: localize("devices.system_type_underfloor", lang) },
+                  { value: "boiler", label: localize("devices.system_type_boiler", lang) },
                 ]
-              : []),
-            {
-              value: "heat_pump",
-              label: localize(
-                isAc ? "devices.behaviour_heat_pump" : "devices.system_type_heat_pump",
-                lang,
-              ),
-            },
-          ]}
+              : isThermostat
+                ? [
+                    { value: "standard", label: localize("devices.behaviour_standard", lang) },
+                    { value: "radiator", label: localize("devices.system_type_radiator", lang) },
+                    {
+                      value: "underfloor",
+                      label: localize("devices.system_type_underfloor", lang),
+                    },
+                    { value: "boiler", label: localize("devices.system_type_boiler", lang) },
+                  ]
+                : [
+                    { value: "standard", label: localize("devices.behaviour_standard", lang) },
+                    { value: "heat_pump", label: localize("devices.behaviour_heat_pump", lang) },
+                  ]
+          }
           @selected=${(e: Event) => this._onDeviceHeatingTypeChange(entityId, getSelectValue(e))}
           @closed=${(e: Event) => e.stopPropagation()}
           fixedMenuPosition
         >
-          <ha-list-item value="standard"
-            >${localize("devices.behaviour_standard", lang)}</ha-list-item
-          >
           ${
-            isThermostat
+            isSwitch
               ? html`
+                  <ha-list-item value="electric"
+                    >${localize("devices.system_type_electric", lang)}</ha-list-item
+                  >
+                  <ha-list-item value="underfloor"
+                    >${localize("devices.system_type_radiant", lang)}</ha-list-item
+                  >
                   <ha-list-item value="radiator"
                     >${localize("devices.system_type_radiator", lang)}</ha-list-item
                   >
-                  <ha-list-item value="underfloor"
-                    >${localize("devices.system_type_underfloor", lang)}</ha-list-item
+                  <ha-list-item value="boiler"
+                    >${localize("devices.system_type_boiler", lang)}</ha-list-item
                   >
                 `
-              : nothing
-          }
-          ${
-            isAc
-              ? html`<ha-list-item value="heat_pump"
-                  >${localize("devices.behaviour_heat_pump", lang)}</ha-list-item
-                >`
-              : html`<ha-list-item value="heat_pump"
-                  >${localize("devices.system_type_heat_pump", lang)}</ha-list-item
-                >`
+              : isThermostat
+                ? html`
+                    <ha-list-item value="standard"
+                      >${localize("devices.behaviour_standard", lang)}</ha-list-item
+                    >
+                    <ha-list-item value="radiator"
+                      >${localize("devices.system_type_radiator", lang)}</ha-list-item
+                    >
+                    <ha-list-item value="underfloor"
+                      >${localize("devices.system_type_underfloor", lang)}</ha-list-item
+                    >
+                    <ha-list-item value="boiler"
+                      >${localize("devices.system_type_boiler", lang)}</ha-list-item
+                    >
+                  `
+                : html`
+                    <ha-list-item value="standard"
+                      >${localize("devices.behaviour_standard", lang)}</ha-list-item
+                    >
+                    <ha-list-item value="heat_pump"
+                      >${localize("devices.behaviour_heat_pump", lang)}</ha-list-item
+                    >
+                  `
           }
         </ha-select>
         <rs-info-icon .text=${localize("devices.behaviour_hint", lang)}></rs-info-icon>
@@ -1124,7 +1124,7 @@ export class RsDeviceSection extends LitElement {
           : nothing
       }
       ${
-        this.selectedTempSensor && !hasValve
+        this.selectedTempSensor && !hasValve && !isSwitch
           ? html`
               <div class="detail-field with-info">
                 <ha-select
@@ -1284,6 +1284,7 @@ export class RsDeviceSection extends LitElement {
     const device = this.devices.find((d) => d.entity_id === entityId);
     if (!device) return "thermostat";
     if (device.type === "ac") return "ac";
+    if (device.type === "switch") return "switch";
     return "thermostat";
   }
 
@@ -1299,11 +1300,31 @@ export class RsDeviceSection extends LitElement {
     this._fireDeviceChanged(newDevices);
   }
 
-  private _onDeviceTypeChange(entityId: string, type: "thermostat" | "ac") {
-    const deviceType: DeviceType = type === "thermostat" ? "trv" : "ac";
+  private _behaviourLabel(kind: string): string {
+    const key =
+      kind === "electric"
+        ? "devices.system_type_electric"
+        : kind === "boiler"
+          ? "devices.system_type_boiler"
+          : kind === "underfloor"
+            ? "devices.system_type_underfloor"
+            : kind === "radiator"
+              ? "devices.system_type_radiator"
+              : kind === "heat_pump"
+                ? "devices.behaviour_heat_pump"
+                : "devices.behaviour_standard";
+    return localize(key, this.hass.language);
+  }
+
+  private _onDeviceTypeChange(entityId: string, type: "thermostat" | "ac" | "switch") {
+    const deviceType: DeviceType =
+      type === "thermostat" ? "trv" : type === "switch" ? "switch" : "ac";
     const newDevices = this.devices.map((d) => {
       if (d.entity_id !== entityId) return d;
-      const updated: DeviceConfig = { ...d, type: deviceType };
+      const updated: DeviceConfig = { ...d, type: deviceType, role: "auto" };
+      if (deviceType === "switch" && !updated.heating_system_type) {
+        updated.heating_system_type = "electric";
+      }
       // idle_action="low" is TRV-only; the backend schema rejects it for ACs.
       // Reset when switching to AC so the next save does not fail.
       if (deviceType === "ac" && updated.idle_action === "low") {
@@ -1478,15 +1499,6 @@ export class RsDeviceSection extends LitElement {
     );
   }
 
-  private _onHeatRoleChange(entityId: string, value: string | undefined) {
-    if (value !== "auto" && value !== "primary" && value !== "secondary" && value !== "cool_only") {
-      return;
-    }
-    this._fireDeviceChanged(
-      this.devices.map((d) => (d.entity_id === entityId ? { ...d, role: value } : d)),
-    );
-  }
-
   private _onDeviceHeatingTypeChange(entityId: string, value: string | undefined) {
     if (!value) return;
     const heating = value === "standard" ? "" : value;
@@ -1522,19 +1534,30 @@ export class RsDeviceSection extends LitElement {
     const idAfterDot = id.substring(id.indexOf(".") + 1);
     if (idAfterDot.startsWith("roommind_")) return false;
     if (this.devices.some((d) => d.entity_id === id)) return false;
-    return id.startsWith("climate.");
+    return id.startsWith("climate.") || id.startsWith("switch.");
   };
 
   private _onEntityPicked(e: CustomEvent) {
     const entityId = e.detail?.value as string;
     const picker = e.target as HTMLElement & { value: string };
     picker.value = "";
-    if (!entityId || !entityId.startsWith("climate.")) return;
+    if (!entityId || !(entityId.startsWith("climate.") || entityId.startsWith("switch."))) return;
     if (this.devices.some((d) => d.entity_id === entityId)) return;
-    const detected = this._detectClimateType(entityId);
-    const type: DeviceType = detected === "thermostat" ? "trv" : "ac";
-    const newDevices = [...this.devices, { entity_id: entityId, type, role: "auto" as const }];
-    this._fireDeviceChanged(newDevices);
+    let type: DeviceType = "switch";
+    let role: DeviceConfig["role"] = "auto";
+    let heating = "electric";
+    if (entityId.startsWith("climate.")) {
+      const detected = this._detectClimateType(entityId);
+      type = detected === "thermostat" ? "trv" : "ac";
+      heating = "";
+      const modes = (this.hass.states[entityId]?.attributes?.hvac_modes ?? []) as string[];
+      const canHeat = modes.some((mode) => ["heat", "heat_cool", "auto"].includes(mode));
+      const canCool = modes.some((mode) => ["cool", "heat_cool"].includes(mode));
+      if (canCool && !canHeat) role = "cool_only";
+    }
+    const added: DeviceConfig = { entity_id: entityId, type, role };
+    if (heating) added.heating_system_type = heating;
+    this._fireDeviceChanged([...this.devices, added]);
   }
 }
 

@@ -180,6 +180,7 @@
   "devices.other_area": "Other area",
   "devices.type_thermostat": "Thermostat",
   "devices.type_ac": "Climate Device",
+  "devices.type_switch": "Switch",
   "devices.type_label": "Type",
   "devices.select_to_configure": "Select a device to configure",
   "devices.heating_system_type": "Heating System Type",
@@ -596,6 +597,9 @@
   "heat_source.secondary_power_scale": "Backup power scale",
   "heat_source.secondary_power_scale_hint": "Fraction of the heating command sent to the backup while both sources are on.",
   "devices.system_type_heat_pump": "Heat pump",
+  "devices.system_type_electric": "Electric heater",
+  "devices.system_type_boiler": "Boiler",
+  "devices.system_type_radiant": "Radiant floor",
   "devices.heat_role": "Heating role",
   "devices.heat_role_auto": "Automatic",
   "devices.heat_role_primary": "Primary",
@@ -605,6 +609,6 @@
   "devices.behaviour": "Heating behaviour",
   "devices.behaviour_standard": "Standard",
   "devices.behaviour_heat_pump": "Heat pump",
-  "devices.behaviour_hint": "A heat pump keeps a 15 minute minimum run. A floor keeps the long residual-heat profile.",
+  "devices.behaviour_hint": "This is what the device is. A floor, boiler, radiator, or electric heater is the plant. A climate that can heat is the backup. A boiler keeps a 10 minute minimum run, a heat pump 15, a floor the long residual-heat profile.",
   "devices.valve_closing_entity_hint": "Keeps the valve at the set opening whatever the thermostat's own control wants. Filled in automatically when the device has one."
 }

@@ -72,7 +72,7 @@ export interface ScheduleTempWarning {
   value: string; // the offending raw value; may not be numeric
 }
 
-export type DeviceType = "trv" | "ac";
+export type DeviceType = "trv" | "ac" | "switch";
 export type DeviceRole = "primary" | "secondary" | "cool_only" | "auto";
 
 export interface DeviceConfig {

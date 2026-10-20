@@ -13,6 +13,7 @@ from custom_components.roommind.control.mpc_controller import (
     _resolve_idle_setpoint,
     _send_idle_setpoint,
     _snap_to_step,
+    _switch_on_since,
     async_idle_device,
     async_turn_off_climate,
     clear_command_cache,
@@ -4529,6 +4530,43 @@ async def test_follow_setpoint_adds_offset():
     set_temp_calls = [c for c in hass.services.async_call.call_args_list if c[0][1] == "set_temperature"]
     assert set_temp_calls
     assert set_temp_calls[0][0][2]["temperature"] == 18.0
+
+
+@pytest.mark.asyncio
+async def test_boiler_switch_stays_on_for_its_minimum_run():
+    """A boiler switch heats with the room and does not drop out inside 10 minutes."""
+    hass = build_hass()
+    room = make_room(thermostats=[], acs=[])
+    room["devices"] = [
+        {
+            "entity_id": "switch.boiler",
+            "type": "switch",
+            "role": "auto",
+            "heating_system_type": "boiler",
+        }
+    ]
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=5.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    _switch_on_since.clear()
+    await ctrl.async_apply("heating", 21.0, current_temp=19.0)
+    assert any(c[0][0] == "switch" and c[0][1] == "turn_on" for c in hass.services.async_call.call_args_list)
+
+    hass.services.async_call.reset_mock()
+    await ctrl.async_apply("idle", 21.0, current_temp=21.0)
+    services = [(c[0][0], c[0][1]) for c in hass.services.async_call.call_args_list if c[0][0] == "switch"]
+    assert ("switch", "turn_on") in services
+    assert ("switch", "turn_off") not in services
+
+    _switch_on_since["switch.boiler"] = 0.0
+    hass.services.async_call.reset_mock()
+    await ctrl.async_apply("idle", 21.0, current_temp=21.0)
+    assert any(c[0][0] == "switch" and c[0][1] == "turn_off" for c in hass.services.async_call.call_args_list)
 
 
 @pytest.mark.asyncio

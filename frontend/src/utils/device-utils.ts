@@ -5,7 +5,14 @@
 
 import type { DeviceConfig } from "../types";
 
-const HST_PRIORITY: Record<string, number> = { underfloor: 3, radiator: 2, heat_pump: 1, "": 0 };
+const HST_PRIORITY: Record<string, number> = {
+  underfloor: 4,
+  boiler: 3,
+  radiator: 2,
+  electric: 1,
+  heat_pump: 1,
+  "": 0,
+};
 
 /**
  * Resolve room-level heating_system_type from devices.
@@ -15,7 +22,7 @@ const HST_PRIORITY: Record<string, number> = { underfloor: 3, radiator: 2, heat_
 export function resolveHeatingSystemType(devices: DeviceConfig[]): string {
   let best = "";
   for (const d of devices) {
-    if (d.type !== "trv") continue;
+    if (d.type !== "trv" && d.type !== "switch") continue;
     const hst = d.heating_system_type ?? "";
     if ((HST_PRIORITY[hst] ?? 0) > (HST_PRIORITY[best] ?? 0)) best = hst;
   }

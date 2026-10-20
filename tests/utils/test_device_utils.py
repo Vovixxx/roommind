@@ -43,7 +43,7 @@ from custom_components.roommind.utils.device_utils import (
 
 
 def test_valid_device_types():
-    assert VALID_DEVICE_TYPES == {"trv", "ac"}
+    assert VALID_DEVICE_TYPES == {"trv", "ac", "switch"}
 
 
 def test_device_role_auto_constant():
@@ -64,8 +64,29 @@ def test_heat_source_groups_roles():
     assert secondary == [("climate.split", "ac")]
 
 
+def test_switch_plant_is_primary_and_heat_pump_is_backup():
+    devices = [
+        {"entity_id": "switch.floor", "type": "switch", "role": "auto", "heating_system_type": "underfloor"},
+        {"entity_id": "climate.split", "type": "ac", "role": "auto", "heating_system_type": "heat_pump"},
+        {"entity_id": "climate.cool", "type": "ac", "role": "cool_only"},
+    ]
+    primary, secondary = heat_source_groups(devices)
+    assert primary == [("switch.floor", "thermostat")]
+    assert secondary == [("climate.split", "ac")]
+
+
+def test_boiler_switch_sets_the_room_profile():
+    from custom_components.roommind.utils.device_utils import get_room_heating_system_type
+
+    devices = [
+        {"entity_id": "switch.boiler", "type": "switch", "heating_system_type": "boiler"},
+        {"entity_id": "climate.split", "type": "ac", "heating_system_type": "heat_pump"},
+    ]
+    assert get_room_heating_system_type(devices) == "boiler"
+
+
 def test_valid_heating_system_types():
-    assert VALID_HEATING_SYSTEM_TYPES == {"", "radiator", "underfloor", "heat_pump"}
+    assert VALID_HEATING_SYSTEM_TYPES == {"", "radiator", "underfloor", "heat_pump", "electric", "boiler"}
 
 
 # ---------------------------------------------------------------------------

@@ -175,6 +175,18 @@ HEATING_SYSTEM_PROFILES: dict[str, dict[str, float]] = {
         "tau_charge_minutes": 8.0,
         "min_run_minutes": 15.0,
     },
+    "electric": {
+        "tau_minutes": 5.0,
+        "initial_fraction": 0.1,
+        "tau_charge_minutes": 5.0,
+        "min_run_minutes": 5.0,
+    },
+    "boiler": {
+        "tau_minutes": 25.0,
+        "initial_fraction": 0.55,
+        "tau_charge_minutes": 20.0,
+        "min_run_minutes": 10.0,
+    },
 }
 RESIDUAL_HEAT_CUTOFF = 0.02  # below this q_residual is treated as zero
 

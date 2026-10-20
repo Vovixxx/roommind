@@ -69,7 +69,7 @@ def _validate_device_coil_dry(device: dict) -> dict:
     A TRV has no evaporator coil, so "on" is meaningless there. "inherit" and
     "off" stay allowed for both types so a uniform device dict is always valid.
     """
-    if device.get("type") == "trv" and device.get("coil_dry") == COIL_DRY_ON:
+    if device.get("type") != "ac" and device.get("coil_dry") == COIL_DRY_ON:
         raise vol.Invalid("coil_dry='on' is only supported for ACs (type='ac')")
     return device
 
@@ -383,10 +383,10 @@ async def websocket_list_rooms(
             vol.All(
                 {
                     vol.Required("entity_id"): str,
-                    vol.Required("type"): vol.In(["trv", "ac"]),
+                    vol.Required("type"): vol.In(["trv", "ac", "switch"]),
                     vol.Optional("role", default="auto"): vol.In(["primary", "secondary", "cool_only", "auto"]),
                     vol.Optional("heating_system_type", default=""): vol.In(
-                        ["", "radiator", "underfloor", "heat_pump"]
+                        ["", "radiator", "underfloor", "heat_pump", "electric", "boiler"]
                     ),
                     vol.Optional("idle_action", default="off"): vol.In(["off", "fan_only", "setback", "low"]),
                     vol.Optional("idle_fan_mode", default="low"): str,
@@ -423,7 +423,7 @@ async def websocket_list_rooms(
         vol.Optional("eco_cool"): vol.Coerce(float),
         vol.Optional("presence_persons"): [str],
         vol.Optional("display_name"): str,
-        vol.Optional("heating_system_type"): vol.In(["", "radiator", "underfloor", "heat_pump"]),
+        vol.Optional("heating_system_type"): vol.In(["", "radiator", "underfloor", "heat_pump", "electric", "boiler"]),
         vol.Optional("covers"): [str],
         vol.Optional("covers_auto_enabled"): bool,
         vol.Optional("covers_deploy_threshold"): vol.All(vol.Coerce(float), vol.Range(min=0)),

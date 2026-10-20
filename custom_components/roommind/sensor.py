@@ -95,7 +95,7 @@ class RoomMindTargetTemperatureSensor(_RoomMindBaseSensor):
         unit = getattr(getattr(getattr(self.hass, "config", None), "units", None), "temperature_unit", None)
         if isinstance(unit, str):
             return unit
-        return UnitOfTemperature.CELSIUS
+        return str(UnitOfTemperature.CELSIUS)
 
     @property
     def native_value(self) -> float | None:

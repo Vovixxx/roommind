@@ -118,16 +118,18 @@ class _HaUnitClimate:
     @property
     def temperature_unit(self) -> str:
         if _unit_is_fahrenheit(self.hass):
-            return UnitOfTemperature.FAHRENHEIT
-        return UnitOfTemperature.CELSIUS
+            return str(UnitOfTemperature.FAHRENHEIT)
+        return str(UnitOfTemperature.CELSIUS)
 
     @property
     def min_temp(self) -> float:
-        return float(_c_to_display(self.hass, MIN_TARGET_TEMP))
+        shown = _c_to_display(self.hass, MIN_TARGET_TEMP)
+        return shown if shown is not None else float(MIN_TARGET_TEMP)
 
     @property
     def max_temp(self) -> float:
-        return float(_c_to_display(self.hass, MAX_TARGET_TEMP))
+        shown = _c_to_display(self.hass, MAX_TARGET_TEMP)
+        return shown if shown is not None else float(MAX_TARGET_TEMP)
 
     @property
     def target_temperature_step(self) -> float:

@@ -90,6 +90,7 @@ from .utils.device_utils import (
     get_direct_setpoint_eids,
     get_follow_setpoint_eids,
     get_setpoint_offsets,
+    get_switch_eids,
     get_trv_eids,
     get_valve_entities,
     room_contributes_to_group,
@@ -952,7 +953,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             room.get("heat_source_orchestration", False)
             and mode == MODE_HEATING
             and has_external_sensor
-            and get_trv_eids(room.get("devices", []))
+            and (get_trv_eids(room.get("devices", [])) or get_switch_eids(room.get("devices", [])))
             and get_ac_eids(room.get("devices", []))
         ):
             now = time.monotonic()

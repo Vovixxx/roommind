@@ -12,7 +12,8 @@ _LOGGER = logging.getLogger(__name__)
 
 DEVICE_TYPE_TRV = "trv"
 DEVICE_TYPE_AC = "ac"
-VALID_DEVICE_TYPES = {DEVICE_TYPE_TRV, DEVICE_TYPE_AC}
+DEVICE_TYPE_SWITCH = "switch"
+VALID_DEVICE_TYPES = {DEVICE_TYPE_TRV, DEVICE_TYPE_AC, DEVICE_TYPE_SWITCH}
 
 DEVICE_ROLE_AUTO = "auto"
 DEVICE_ROLE_PRIMARY = "primary"
@@ -20,10 +21,10 @@ DEVICE_ROLE_SECONDARY = "secondary"
 DEVICE_ROLE_COOL_ONLY = "cool_only"
 VALID_DEVICE_ROLES = {DEVICE_ROLE_AUTO, DEVICE_ROLE_PRIMARY, DEVICE_ROLE_SECONDARY, DEVICE_ROLE_COOL_ONLY}
 
-VALID_HEATING_SYSTEM_TYPES = {"", "radiator", "underfloor", "heat_pump"}
+VALID_HEATING_SYSTEM_TYPES = {"", "radiator", "underfloor", "heat_pump", "electric", "boiler"}
 
 # Heating system type priority: higher = longer residual heat tau
-HST_PRIORITY = {"underfloor": 3, "radiator": 2, "heat_pump": 1, "": 0}
+HST_PRIORITY = {"underfloor": 4, "boiler": 3, "radiator": 2, "electric": 1, "heat_pump": 1, "": 0}
 
 IDLE_ACTION_OFF = "off"
 IDLE_ACTION_FAN_ONLY = "fan_only"
@@ -161,6 +162,8 @@ def devices_to_legacy(devices: list[dict]) -> tuple[list[str], list[str]]:
             thermostats.append(eid)
         elif dtype == DEVICE_TYPE_AC:
             acs.append(eid)
+        elif dtype == DEVICE_TYPE_SWITCH:
+            continue
         else:
             _LOGGER.warning("Skipping device with unknown type '%s': %s", dtype, eid)
     return thermostats, acs
@@ -192,10 +195,14 @@ def ensure_room_has_devices(room: dict) -> dict:
                 "re-generating devices from legacy (downgrade recovery)",
                 room.get("area_id", "unknown"),
             )
-            room["devices"] = legacy_to_devices(
-                actual_t,
-                actual_a,
-                room.get("heating_system_type", ""),
+            preserved = [d for d in room["devices"] if d.get("type") == DEVICE_TYPE_SWITCH]
+            room["devices"] = (
+                legacy_to_devices(
+                    actual_t,
+                    actual_a,
+                    room.get("heating_system_type", ""),
+                )
+                + preserved
             )
     # Always regenerate legacy from devices (devices is source of truth after migration)
     thermostats, acs = devices_to_legacy(room["devices"])
@@ -212,11 +219,11 @@ def get_room_heating_system_type(devices: list[dict]) -> str:
     With mixed types (e.g., radiator TRV + underfloor TRV), the one with the
     longest residual heat tau wins:
     underfloor (tau=90min) > radiator (tau=10min) > "" (no residual heat).
-    Only TRV devices are considered (ACs/HPs have no heating system profile).
+    Thermostats and heat switches count. A heat pump does not set the room profile.
     """
     best = ""
     for d in devices:
-        if d.get("type") != DEVICE_TYPE_TRV:
+        if d.get("type") not in (DEVICE_TYPE_TRV, DEVICE_TYPE_SWITCH):
             continue
         hst = d.get("heating_system_type", "")
         if HST_PRIORITY.get(hst, 0) > HST_PRIORITY.get(best, 0):
@@ -251,14 +258,21 @@ def get_ac_eids(devices: list[dict]) -> list[str]:
     return get_entity_ids_by_type(devices, DEVICE_TYPE_AC)
 
 
+def get_switch_eids(devices: list[dict]) -> list[str]:
+    """Shortcut for get_entity_ids_by_type(devices, "switch")."""
+    return get_entity_ids_by_type(devices, DEVICE_TYPE_SWITCH)
+
+
 def heat_source_groups(devices: list[dict]) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """Split devices into primary and secondary heaters.
 
-    ``role`` overrides the type default. ``auto`` keeps TRV as primary and AC as
-    secondary. ``cool_only`` is left out of heating.
+    A saved primary, secondary, or cool-only role still wins. Otherwise a
+    thermostat or heat switch is the plant and a climate that can heat is
+    the backup. Cool-only climates are left out of heating.
     """
     primary: list[tuple[str, str]] = []
     secondary: list[tuple[str, str]] = []
+    auto: list[tuple[str, str, int]] = []
     for device in devices:
         entity_id = device.get("entity_id")
         if not entity_id:
@@ -267,13 +281,22 @@ def heat_source_groups(devices: list[dict]) -> tuple[list[tuple[str, str]], list
         role = device.get("role") or DEVICE_ROLE_AUTO
         if role not in VALID_DEVICE_ROLES:
             role = DEVICE_ROLE_AUTO
-        if role == DEVICE_ROLE_COOL_ONLY:
+        if role == DEVICE_ROLE_COOL_ONLY or dtype not in VALID_DEVICE_TYPES:
             continue
-        kind = "thermostat" if dtype == DEVICE_TYPE_TRV else "ac"
-        if role == DEVICE_ROLE_PRIMARY or (role == DEVICE_ROLE_AUTO and dtype == DEVICE_TYPE_TRV):
+        kind = "ac" if dtype == DEVICE_TYPE_AC else "thermostat"
+        if role == DEVICE_ROLE_PRIMARY:
             primary.append((entity_id, kind))
-        elif role == DEVICE_ROLE_SECONDARY or (role == DEVICE_ROLE_AUTO and dtype == DEVICE_TYPE_AC):
+        elif role == DEVICE_ROLE_SECONDARY:
             secondary.append((entity_id, kind))
+        else:
+            auto.append((entity_id, kind, 1 if dtype == DEVICE_TYPE_AC else 2))
+    if auto:
+        top = max(rank for _, _, rank in auto)
+        for entity_id, kind, rank in auto:
+            if rank == top:
+                primary.append((entity_id, kind))
+            else:
+                secondary.append((entity_id, kind))
     return primary, secondary
 
 

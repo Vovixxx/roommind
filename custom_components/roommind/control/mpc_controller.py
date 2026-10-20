@@ -60,6 +60,7 @@ from ..utils.device_utils import (
     get_idle_action,
     get_setpoint_offset,
     get_setpoint_offsets,
+    get_switch_eids,
     get_trv_eids,
     get_valve_entities,
     has_reliable_hvac_modes,
@@ -97,6 +98,7 @@ _active_targets: dict[str, tuple[float | None, float | None]] = {}
 # Devices whose overshoot target the hold already passed on; one send per hold, so a device
 # that does not take the value is not commanded every cycle until the min-run ends.
 _overshoot_sent: set[str] = set()
+_switch_on_since: dict[str, float] = {}
 # Devices the hold already throttled to minimum (room past its target), one send per hold (#416).
 _hold_modulated: set[str] = set()
 # Last proportional setpoint send per device: (monotonic send time, (heat, cool) targets it was
@@ -959,7 +961,8 @@ def get_can_heat_cool(
     """
     climate_mode = room_config.get("climate_mode", "auto")
     can_heat = climate_mode != CLIMATE_MODE_COOL_ONLY and (
-        bool(get_trv_eids(room_config.get("devices", []))) or acs_can_heat
+        bool(get_trv_eids(room_config.get("devices", [])) or get_switch_eids(room_config.get("devices", [])))
+        or acs_can_heat
     )
     can_cool = climate_mode != CLIMATE_MODE_HEAT_ONLY and bool(get_ac_eids(room_config.get("devices", [])))
 
@@ -1352,6 +1355,7 @@ class MPCController:
         self.room_config = room_config
         self.thermostats: list[str] = get_trv_eids(room_config.get("devices", []))
         self.acs: list[str] = get_ac_eids(room_config.get("devices", []))
+        self._switches: list[str] = get_switch_eids(room_config.get("devices", []))
         self._devices: list[dict] = room_config.get("devices", [])
         self._direct_eids: set[str] = get_direct_setpoint_eids(self._devices)
         self._follow_eids: set[str] = get_follow_setpoint_eids(self._devices)
@@ -1516,7 +1520,7 @@ class MPCController:
             system
             and self.room_config.get("heat_source_orchestration", False)
             and self.has_external_sensor
-            and self.thermostats
+            and (self.thermostats or self._switches)
             and self.acs
         ):
             plan = evaluate_heat_sources(
@@ -1974,6 +1978,43 @@ class MPCController:
             series.append(q if q >= RESIDUAL_HEAT_CUTOFF else 0.0)
         return series
 
+    async def _async_apply_heat_switches(
+        self,
+        mode: str,
+        heat_source_plan: HeatSourcePlan | None,
+        force_off: bool,
+    ) -> None:
+        """Turn heat switches on or off. Each behaviour keeps its own minimum run."""
+        from ..const import HEATING_SYSTEM_PROFILES
+
+        now = time.time()
+        for device in self._devices:
+            if device.get("type") != "switch":
+                continue
+            eid = device.get("entity_id")
+            if not eid:
+                continue
+            want_on = mode == MODE_HEATING and not force_off
+            if heat_source_plan is not None:
+                command = next((item for item in heat_source_plan.commands if item.entity_id == eid), None)
+                want_on = bool(command and command.active) and not force_off
+            profile = HEATING_SYSTEM_PROFILES.get(device.get("heating_system_type") or "")
+            min_run = float(profile["min_run_minutes"]) * 60 if profile else 0.0
+            started = _switch_on_since.get(eid)
+            if not want_on and not force_off and started is not None and min_run > 0 and (now - started) < min_run:
+                want_on = True
+            await self.hass.services.async_call(
+                "switch",
+                "turn_on" if want_on else "turn_off",
+                {"entity_id": eid},
+                blocking=True,
+                context=make_roommind_context(),
+            )
+            if want_on:
+                _switch_on_since.setdefault(eid, now)
+            else:
+                _switch_on_since.pop(eid, None)
+
     async def async_apply(
         self,
         mode: str,
@@ -2030,6 +2071,8 @@ class MPCController:
 
         if mode != MODE_IDLE and target_temp is None:
             mode = MODE_IDLE
+
+        await self._async_apply_heat_switches(mode, heat_source_plan, force_off)
 
         # After the guard above, target_temp is guaranteed non-None for HEATING/COOLING.
         # We assign a typed local for downstream use.
