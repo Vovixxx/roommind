@@ -20,7 +20,7 @@
 | custom\_components/roommind/coordinator.py                         |     1174 |       73 |     94% |436-437, 808-811, 1112-1113, 1123, 1125, 1541, 1543-1545, 1646-1655, 1677, 1686, 1729-1731, 1745, 1773-1774, 1825, 2161-2164, 2342-2344, 2348-2354, 2358, 2367, 2388, 2393, 2395, 2398, 2401, 2442, 2447-2452, 2456, 2489, 2491, 2494, 2497, 2513-2514, 2630, 2650-2658, 2676-2677, 2692-2697, 2714-2715 |
 | custom\_components/roommind/deprecation.py                         |       56 |        0 |    100% |           |
 | custom\_components/roommind/diagnostics.py                         |      231 |        0 |    100% |           |
-| custom\_components/roommind/entity.py                              |       20 |       12 |     40% |14-17, 22, 32-38 |
+| custom\_components/roommind/entity.py                              |       22 |       12 |     45% |17-20, 25, 35-41 |
 | custom\_components/roommind/managers/\_\_init\_\_.py               |        0 |        0 |    100% |           |
 | custom\_components/roommind/managers/ac\_coil\_dry\_manager.py     |      248 |        0 |    100% |           |
 | custom\_components/roommind/managers/compressor\_group\_manager.py |      186 |        2 |     99% |  125, 223 |
@@ -50,7 +50,7 @@
 | custom\_components/roommind/utils/sensor\_utils.py                 |       29 |        1 |     97% |        25 |
 | custom\_components/roommind/utils/temp\_utils.py                   |       26 |        0 |    100% |           |
 | custom\_components/roommind/websocket\_api.py                      |      319 |        2 |     99% |   796-801 |
-| **TOTAL**                                                          | **8036** |  **269** | **97%** |           |
+| **TOTAL**                                                          | **8038** |  **269** | **97%** |           |
 
 
 ## Setup coverage badge
