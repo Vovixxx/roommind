@@ -173,6 +173,48 @@ def _cache_expired(entity_id: str, service: str) -> bool:
     return sent is not None and _now() - sent >= COMMAND_CACHE_REASSERT_SECONDS
 
 
+def _should_use_setpoint_cache(state: Any, data: dict) -> bool:
+    """Return True when a duplicate set_temperature may be skipped via cache.
+
+    HVAC mode is not enough: IR units often report heat or cool and never fill
+    ``temperature`` or ``target_temp_low``. Skipping the cache then resends the
+    same command every cycle. ``set_hvac_mode`` keeps the stricter gate so a
+    cached off cannot block a retry while the device still reports heating.
+    """
+    if _should_use_cache(state):
+        return True
+    if state is None:
+        return True
+    if "target_temp_low" in data:
+        return state.attributes.get("target_temp_low") is None
+    return state.attributes.get("temperature") is None
+
+
+def _inactive_range_bound(
+    commanded: float,
+    *,
+    reported: float | None,
+    resolved: float | None,
+    park: float | None,
+    above: bool,
+) -> float:
+    """Pick the unused side of a dual setpoint without collapsing the band."""
+
+    def _keeps_band(value: float | None) -> bool:
+        if value is None:
+            return False
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return False
+        return number > commanded if above else number < commanded
+
+    for candidate in (resolved, reported, park):
+        if candidate is not None and _keeps_band(candidate):
+            return float(candidate)
+    return commanded
+
+
 def _should_use_cache(state: Any) -> bool:
     """Return True when the sent-command cache should be trusted.
 
@@ -696,8 +738,8 @@ async def async_idle_device(
         if current_temp_attr is not None and abs(float(current_temp_attr) - ha_t) < 0.1:
             return
 
-        # Cache check (only for devices without reliable state feedback)
-        if _should_use_cache(state):
+        # Cache check for IR devices that report HVAC mode but no setpoint
+        if _should_use_setpoint_cache(state, {"temperature": ha_t}):
             cached = _last_commands.get(entity_id)
             if cached and cached.get("service") == "set_temperature" and cached.get("temperature") == ha_t:
                 return
@@ -2934,17 +2976,31 @@ class MPCController:
             and state.attributes.get("target_temp_low") is not None
         ):
             temp = data["temperature"]
-            dev_max = state.attributes.get("max_temp", temp)
-            dev_min = state.attributes.get("min_temp", temp)
+            resolved_heat = resolved_cool = None
+            if self._idle_targets is not None:
+                if self._idle_targets.heat is not None:
+                    resolved_heat = celsius_to_ha_temp(self.hass, self._idle_targets.heat)
+                if self._idle_targets.cool is not None:
+                    resolved_cool = celsius_to_ha_temp(self.hass, self._idle_targets.cool)
             if temp_intent == "heat":
-                cur_high = state.attributes.get("target_temp_high", dev_max)
                 data = {k: v for k, v in data.items() if k != "temperature"}
                 data["target_temp_low"] = temp
-                data["target_temp_high"] = max(temp, cur_high)
+                data["target_temp_high"] = _inactive_range_bound(
+                    temp,
+                    reported=state.attributes.get("target_temp_high"),
+                    resolved=resolved_cool,
+                    park=state.attributes.get("max_temp"),
+                    above=True,
+                )
             elif temp_intent == "cool":
-                cur_low = state.attributes.get("target_temp_low", dev_min)
                 data = {k: v for k, v in data.items() if k != "temperature"}
-                data["target_temp_low"] = min(temp, cur_low)
+                data["target_temp_low"] = _inactive_range_bound(
+                    temp,
+                    reported=state.attributes.get("target_temp_low"),
+                    resolved=resolved_heat,
+                    park=state.attributes.get("min_temp"),
+                    above=False,
+                )
                 data["target_temp_high"] = temp
 
         # Clamp dual-setpoint data to device min/max
@@ -3044,7 +3100,10 @@ class MPCController:
         # Fallback: check sent-command cache (for IR devices without state feedback).
         # Proportional deadband is intentionally NOT applied here — it is anchored to
         # live device state, while this branch handles IR/no-state devices via the cache.
-        if not skip and eid and _should_use_cache(state):
+        use_cmd_cache = (
+            _should_use_setpoint_cache(state, data) if service == "set_temperature" else _should_use_cache(state)
+        )
+        if not skip and eid and use_cmd_cache:
             cache_checked = True
             cached = _cached_command(eid, service)
             if cached is not None and not _cache_expired(eid, service):
