@@ -152,6 +152,10 @@ _ROOM_SAVE_FIELDS = (
     "heat_source_join_delta",
     "heat_source_join_hold_minutes",
     "heat_source_drop_hysteresis",
+    "heat_source_hysteresis",
+    "heat_source_large_gap_multiplier",
+    "heat_source_secondary_power_scale",
+    "heat_source_preference",
     "valve_protection_exclude",
     "climate_control_enabled",
 )
@@ -381,8 +385,10 @@ async def websocket_list_rooms(
                 {
                     vol.Required("entity_id"): str,
                     vol.Required("type"): vol.In(["trv", "ac"]),
-                    vol.Optional("role", default="auto"): vol.In(["primary", "secondary", "auto"]),
-                    vol.Optional("heating_system_type", default=""): vol.In(["", "radiator", "underfloor"]),
+                    vol.Optional("role", default="auto"): vol.In(["primary", "secondary", "cool_only", "auto"]),
+                    vol.Optional("heating_system_type", default=""): vol.In(
+                        ["", "radiator", "underfloor", "heat_pump"]
+                    ),
                     vol.Optional("idle_action", default="off"): vol.In(["off", "fan_only", "setback", "low"]),
                     vol.Optional("idle_fan_mode", default="low"): str,
                     vol.Optional("setpoint_mode", default="proportional"): vol.In(
@@ -420,7 +426,7 @@ async def websocket_list_rooms(
         vol.Optional("eco_cool"): vol.Coerce(float),
         vol.Optional("presence_persons"): [str],
         vol.Optional("display_name"): str,
-        vol.Optional("heating_system_type"): vol.In(["", "radiator", "underfloor"]),
+        vol.Optional("heating_system_type"): vol.In(["", "radiator", "underfloor", "heat_pump"]),
         vol.Optional("covers"): [str],
         vol.Optional("covers_auto_enabled"): bool,
         vol.Optional("covers_deploy_threshold"): vol.All(vol.Coerce(float), vol.Range(min=0)),
@@ -452,6 +458,10 @@ async def websocket_list_rooms(
         vol.Optional("heat_source_join_delta"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=3.0)),
         vol.Optional("heat_source_join_hold_minutes"): vol.All(vol.Coerce(int), vol.Range(min=15, max=90)),
         vol.Optional("heat_source_drop_hysteresis"): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=1.5)),
+        vol.Optional("heat_source_hysteresis"): vol.All(vol.Coerce(float), vol.Range(min=0, max=2)),
+        vol.Optional("heat_source_large_gap_multiplier"): vol.All(vol.Coerce(float), vol.Range(min=1, max=8)),
+        vol.Optional("heat_source_secondary_power_scale"): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=1)),
+        vol.Optional("heat_source_preference"): vol.In(["outdoor", "primary"]),
         vol.Optional("climate_control_enabled"): bool,
     }
 )

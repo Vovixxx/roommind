@@ -26,6 +26,10 @@ export class RsHeatSourceSection extends LitElement {
   @property({ type: Number }) public joinDelta = 1.1;
   @property({ type: Number }) public joinHoldMinutes = 30;
   @property({ type: Number }) public dropHysteresis = 0.3;
+  @property({ type: Number }) public hysteresis = 0.3;
+  @property({ type: Number }) public largeGapMultiplier = 2.0;
+  @property({ type: Number }) public secondaryPowerScale = 0.7;
+  @property() public preference: "outdoor" | "primary" = "outdoor";
   @property({ type: Boolean }) public editing = false;
 
   static styles = [
@@ -103,7 +107,7 @@ export class RsHeatSourceSection extends LitElement {
       .thresholds {
         margin-top: 16px;
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 12px;
       }
 
@@ -182,6 +186,17 @@ export class RsHeatSourceSection extends LitElement {
         >
         · ${localize("heat_source.ac_min_outdoor", lang)}:
         <strong>${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong>
+        · ${localize("heat_source.preference", lang)}:
+        <strong
+          >${localize(
+            this.preference === "primary"
+              ? "heat_source.preference_primary"
+              : "heat_source.preference_outdoor",
+            lang,
+          )}</strong
+        >
+        · ${localize("heat_source.large_gap_multiplier", lang)}:
+        <strong>${this.largeGapMultiplier}×</strong>
       </div>`;
     }
 
@@ -194,105 +209,139 @@ export class RsHeatSourceSection extends LitElement {
         <ha-switch .checked=${this.enabled} @change=${this._onSwitchChange}></ha-switch>
       </div>
 
-      ${this.enabled
-        ? html`
-            <div class="policy-row">
-              <div class="threshold-label">
-                <span>${localize("heat_source.policy", lang)}</span>
-                <rs-info-icon .text=${localize("heat_source.policy_hint", lang)}></rs-info-icon>
+      ${
+        this.enabled
+          ? html`
+              <div class="policy-row">
+                <div class="threshold-label">
+                  <span>${localize("heat_source.policy", lang)}</span>
+                  <rs-info-icon .text=${localize("heat_source.policy_hint", lang)}></rs-info-icon>
+                </div>
+                <ha-select
+                  .value=${policy}
+                  .options=${[
+                    {
+                      value: "efficiency",
+                      label: localize("heat_source.policy_efficiency", lang),
+                    },
+                    {
+                      value: "hydronic_first",
+                      label: localize("heat_source.policy_hydronic_first", lang),
+                    },
+                    {
+                      value: "air_first",
+                      label: localize("heat_source.policy_air_first", lang),
+                    },
+                  ]}
+                  fixedMenuPosition
+                  @selected=${this._onPolicySelected}
+                  @closed=${(e: Event) => e.stopPropagation()}
+                >
+                  <ha-list-item value="efficiency"
+                    >${localize("heat_source.policy_efficiency", lang)}</ha-list-item
+                  >
+                  <ha-list-item value="hydronic_first"
+                    >${localize("heat_source.policy_hydronic_first", lang)}</ha-list-item
+                  >
+                  <ha-list-item value="air_first"
+                    >${localize("heat_source.policy_air_first", lang)}</ha-list-item
+                  >
+                </ha-select>
               </div>
-              <ha-select
-                .value=${policy}
-                .options=${[
-                  {
-                    value: "efficiency",
-                    label: localize("heat_source.policy_efficiency", lang),
-                  },
-                  {
-                    value: "hydronic_first",
-                    label: localize("heat_source.policy_hydronic_first", lang),
-                  },
-                  {
-                    value: "air_first",
-                    label: localize("heat_source.policy_air_first", lang),
-                  },
-                ]}
-                fixedMenuPosition
-                @selected=${this._onPolicySelected}
-                @closed=${(e: Event) => e.stopPropagation()}
-              >
-                <ha-list-item value="efficiency"
-                  >${localize("heat_source.policy_efficiency", lang)}</ha-list-item
-                >
-                <ha-list-item value="hydronic_first"
-                  >${localize("heat_source.policy_hydronic_first", lang)}</ha-list-item
-                >
-                <ha-list-item value="air_first"
-                  >${localize("heat_source.policy_air_first", lang)}</ha-list-item
-                >
-              </ha-select>
-            </div>
-            <div class="thresholds">
-              ${policy === "efficiency"
-                ? html`
-                    ${this._renderThresholdCell({
-                      label: localize("heat_source.primary_delta", lang),
-                      hint: localize("heat_source.primary_delta_hint", lang),
-                      suffix: localize("heat_source.primary_delta_suffix", lang),
-                      value: this.primaryDelta,
-                      min: 0.5,
-                      max: 5.0,
-                      step: 0.1,
-                      key: "heat_source_primary_delta",
-                    })}
-                    ${this._renderThresholdCell({
-                      label: localize("heat_source.outdoor_threshold", lang),
-                      hint: localize("heat_source.outdoor_threshold_hint", lang),
-                      suffix: localize("heat_source.outdoor_threshold_suffix", lang),
-                      value: this.outdoorThreshold,
-                      min: -20,
-                      max: 25,
-                      step: 1,
-                      key: "heat_source_outdoor_threshold",
-                    })}
-                    ${this._renderAcMinOutdoorCell(lang)}
-                  `
-                : html`
-                    ${this._renderThresholdCell({
-                      label: localize("heat_source.join_delta", lang),
-                      hint: localize("heat_source.join_delta_hint", lang),
-                      suffix: localize("heat_source.join_delta_suffix", lang),
-                      value: this.joinDelta,
-                      min: 0.5,
-                      max: 3.0,
-                      step: 0.1,
-                      key: "heat_source_join_delta",
-                    })}
-                    ${this._renderThresholdCell({
-                      label: localize("heat_source.join_hold", lang),
-                      hint: localize("heat_source.join_hold_hint", lang),
-                      suffix: localize("heat_source.join_hold_suffix", lang),
-                      value: this.joinHoldMinutes,
-                      min: 15,
-                      max: 90,
-                      step: 1,
-                      key: "heat_source_join_hold_minutes",
-                    })}
-                    ${this._renderThresholdCell({
-                      label: localize("heat_source.drop_hysteresis", lang),
-                      hint: localize("heat_source.drop_hysteresis_hint", lang),
-                      suffix: localize("heat_source.drop_hysteresis_suffix", lang),
-                      value: this.dropHysteresis,
-                      min: 0.1,
-                      max: 1.5,
-                      step: 0.1,
-                      key: "heat_source_drop_hysteresis",
-                    })}
-                    ${this._renderAcMinOutdoorCell(lang)}
-                  `}
-            </div>
-          `
-        : nothing}
+              <div class="thresholds">
+                ${
+                  policy === "efficiency"
+                    ? html`
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.primary_delta", lang),
+                          hint: localize("heat_source.primary_delta_hint", lang),
+                          suffix: localize("heat_source.primary_delta_suffix", lang),
+                          value: this.primaryDelta,
+                          min: 0.5,
+                          max: 5.0,
+                          step: 0.1,
+                          key: "heat_source_primary_delta",
+                        })}
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.outdoor_threshold", lang),
+                          hint: localize("heat_source.outdoor_threshold_hint", lang),
+                          suffix: localize("heat_source.outdoor_threshold_suffix", lang),
+                          value: this.outdoorThreshold,
+                          min: -20,
+                          max: 25,
+                          step: 1,
+                          key: "heat_source_outdoor_threshold",
+                        })}
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.hysteresis", lang),
+                          hint: localize("heat_source.hysteresis_hint", lang),
+                          suffix: localize("heat_source.primary_delta_suffix", lang),
+                          value: this.hysteresis,
+                          min: 0,
+                          max: 2,
+                          step: 0.1,
+                          key: "heat_source_hysteresis",
+                        })}
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.large_gap_multiplier", lang),
+                          hint: localize("heat_source.large_gap_multiplier_hint", lang),
+                          suffix: "×",
+                          value: this.largeGapMultiplier,
+                          min: 1,
+                          max: 8,
+                          step: 0.1,
+                          key: "heat_source_large_gap_multiplier",
+                        })}
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.secondary_power_scale", lang),
+                          hint: localize("heat_source.secondary_power_scale_hint", lang),
+                          suffix: "",
+                          value: this.secondaryPowerScale,
+                          min: 0.1,
+                          max: 1,
+                          step: 0.05,
+                          key: "heat_source_secondary_power_scale",
+                        })}
+                        ${this._renderAcMinOutdoorCell(lang)}
+                      `
+                    : html`
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.join_delta", lang),
+                          hint: localize("heat_source.join_delta_hint", lang),
+                          suffix: localize("heat_source.join_delta_suffix", lang),
+                          value: this.joinDelta,
+                          min: 0.5,
+                          max: 3.0,
+                          step: 0.1,
+                          key: "heat_source_join_delta",
+                        })}
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.join_hold", lang),
+                          hint: localize("heat_source.join_hold_hint", lang),
+                          suffix: localize("heat_source.join_hold_suffix", lang),
+                          value: this.joinHoldMinutes,
+                          min: 15,
+                          max: 90,
+                          step: 1,
+                          key: "heat_source_join_hold_minutes",
+                        })}
+                        ${this._renderThresholdCell({
+                          label: localize("heat_source.drop_hysteresis", lang),
+                          hint: localize("heat_source.drop_hysteresis_hint", lang),
+                          suffix: localize("heat_source.drop_hysteresis_suffix", lang),
+                          value: this.dropHysteresis,
+                          min: 0.1,
+                          max: 1.5,
+                          step: 0.1,
+                          key: "heat_source_drop_hysteresis",
+                        })}
+                        ${this._renderAcMinOutdoorCell(lang)}
+                      `
+                }
+              </div>
+            `
+          : nothing
+      }
     `;
   }
 

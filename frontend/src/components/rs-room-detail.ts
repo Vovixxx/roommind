@@ -97,6 +97,10 @@ export class RsRoomDetail extends LitElement {
   @state() private _heatSourceJoinDelta = 1.1;
   @state() private _heatSourceJoinHoldMinutes = 30;
   @state() private _heatSourceDropHysteresis = 0.3;
+  @state() private _heatSourceHysteresis = 0.3;
+  @state() private _heatSourceLargeGapMultiplier = 2;
+  @state() private _heatSourceSecondaryPowerScale = 0.7;
+  @state() private _heatSourcePreference: "outdoor" | "primary" = "outdoor";
   @state() private _optimisticCoverResume = false;
 
   private _prevAreaId: string | null = null;
@@ -304,6 +308,10 @@ export class RsRoomDetail extends LitElement {
       this._heatSourceJoinDelta = this.config.heat_source_join_delta ?? 1.1;
       this._heatSourceJoinHoldMinutes = this.config.heat_source_join_hold_minutes ?? 30;
       this._heatSourceDropHysteresis = this.config.heat_source_drop_hysteresis ?? 0.3;
+      this._heatSourceHysteresis = this.config.heat_source_hysteresis ?? 0.3;
+      this._heatSourceLargeGapMultiplier = this.config.heat_source_large_gap_multiplier ?? 2;
+      this._heatSourceSecondaryPowerScale = this.config.heat_source_secondary_power_scale ?? 0.7;
+      this._heatSourcePreference = this.config.heat_source_preference ?? "outdoor";
     } else {
       this._devices = [];
       this._selectedTempSensor = "";
@@ -348,6 +356,10 @@ export class RsRoomDetail extends LitElement {
       this._heatSourceJoinDelta = 1.1;
       this._heatSourceJoinHoldMinutes = 30;
       this._heatSourceDropHysteresis = 0.3;
+      this._heatSourceHysteresis = 0.3;
+      this._heatSourceLargeGapMultiplier = 2;
+      this._heatSourceSecondaryPowerScale = 0.7;
+      this._heatSourcePreference = "outdoor";
     }
     this._dirty = false;
 
@@ -628,6 +640,10 @@ export class RsRoomDetail extends LitElement {
                     .joinDelta=${this._heatSourceJoinDelta}
                     .joinHoldMinutes=${this._heatSourceJoinHoldMinutes}
                     .dropHysteresis=${this._heatSourceDropHysteresis}
+                    .hysteresis=${this._heatSourceHysteresis}
+                    .largeGapMultiplier=${this._heatSourceLargeGapMultiplier}
+                    .secondaryPowerScale=${this._heatSourceSecondaryPowerScale}
+                    .preference=${this._heatSourcePreference}
                     @setting-changed=${this._onHeatSourceSettingChanged}
                   ></rs-heat-source-section>
                 </rs-section-card>`
@@ -909,6 +925,10 @@ export class RsRoomDetail extends LitElement {
             .joinDelta=${this._heatSourceJoinDelta}
             .joinHoldMinutes=${this._heatSourceJoinHoldMinutes}
             .dropHysteresis=${this._heatSourceDropHysteresis}
+            .hysteresis=${this._heatSourceHysteresis}
+            .largeGapMultiplier=${this._heatSourceLargeGapMultiplier}
+            .secondaryPowerScale=${this._heatSourceSecondaryPowerScale}
+            .preference=${this._heatSourcePreference}
             @setting-changed=${this._onHeatSourceSettingChanged}
           ></rs-heat-source-section>
         </rs-edit-dialog>`;
@@ -1100,6 +1120,13 @@ export class RsRoomDetail extends LitElement {
       this._heatSourceJoinHoldMinutes = value as number;
     else if (key === "heat_source_drop_hysteresis")
       this._heatSourceDropHysteresis = value as number;
+    else if (key === "heat_source_hysteresis") this._heatSourceHysteresis = value as number;
+    else if (key === "heat_source_large_gap_multiplier")
+      this._heatSourceLargeGapMultiplier = value as number;
+    else if (key === "heat_source_secondary_power_scale")
+      this._heatSourceSecondaryPowerScale = value as number;
+    else if (key === "heat_source_preference" && (value === "outdoor" || value === "primary"))
+      this._heatSourcePreference = value;
     this._autoSave();
   }
 
@@ -1179,6 +1206,10 @@ export class RsRoomDetail extends LitElement {
         heat_source_join_delta: this._heatSourceJoinDelta,
         heat_source_join_hold_minutes: this._heatSourceJoinHoldMinutes,
         heat_source_drop_hysteresis: this._heatSourceDropHysteresis,
+        heat_source_hysteresis: this._heatSourceHysteresis,
+        heat_source_large_gap_multiplier: this._heatSourceLargeGapMultiplier,
+        heat_source_secondary_power_scale: this._heatSourceSecondaryPowerScale,
+        heat_source_preference: this._heatSourcePreference,
       });
 
       this._dirty = false;

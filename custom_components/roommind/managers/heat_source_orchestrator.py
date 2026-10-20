@@ -4,7 +4,9 @@ When a room has both thermostats (e.g. radiator TRVs connected to a gas boiler)
 and ACs with heating capability (heat pumps), this module decides which devices
 to activate based on temperature gap (delta-T) and outdoor temperature.
 
-Roles are fixed: thermostats are always primary, ACs are always secondary.
+A device role of primary, secondary, or cool_only overrides the type default
+(thermostat primary, AC secondary). Preference "primary" keeps the floor on
+unless the gap is large enough for both.
 
 The orchestrator sits between the MPC optimizer output (abstract mode + power_fraction)
 and the device command layer (async_apply). It does NOT modify the thermal model or
@@ -20,20 +22,21 @@ from homeassistant.core import HomeAssistant
 
 from ..const import (
     DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR,
-    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+    DEFAULT_HEAT_SOURCE_HYSTERESIS,
     DEFAULT_HEAT_SOURCE_JOIN_DELTA,
     DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
+    DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER,
     DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD,
     DEFAULT_HEAT_SOURCE_POLICY,
+    DEFAULT_HEAT_SOURCE_PREFERENCE,
     DEFAULT_HEAT_SOURCE_PRIMARY_DELTA,
-    HEAT_SOURCE_HYSTERESIS,
-    HEAT_SOURCE_LARGE_GAP_MULTIPLIER,
+    DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE,
     HEAT_SOURCE_POLICY_AIR_FIRST,
     HEAT_SOURCE_POLICY_HYDRONIC_FIRST,
-    HEAT_SOURCE_SECONDARY_POWER_SCALE,
     MODE_HEATING,
 )
-from ..utils.device_utils import get_ac_eids, get_trv_eids, has_reliable_hvac_modes
+from ..utils.device_utils import has_reliable_hvac_modes, heat_source_groups
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,23 +111,26 @@ def evaluate_heat_sources(
     if not room_config.get("heat_source_orchestration", False):
         return None
 
-    thermostats = get_trv_eids(room_config.get("devices", []))
-    acs = get_ac_eids(room_config.get("devices", []))
-    if not thermostats or not acs:
+    primary_devices, secondary_devices = heat_source_groups(room_config.get("devices", []))
+    if not primary_devices or not secondary_devices:
         return None
 
     if current_temp is None or target_temp is None:
         return None
 
-    primary_delta = room_config.get("heat_source_primary_delta", DEFAULT_HEAT_SOURCE_PRIMARY_DELTA)
-    outdoor_threshold = room_config.get("heat_source_outdoor_threshold", DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD)
-    ac_min_outdoor = room_config.get("heat_source_ac_min_outdoor", DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR)
+    primary_delta = float(room_config.get("heat_source_primary_delta", DEFAULT_HEAT_SOURCE_PRIMARY_DELTA))
+    outdoor_threshold = float(room_config.get("heat_source_outdoor_threshold", DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD))
+    ac_min_outdoor = float(room_config.get("heat_source_ac_min_outdoor", DEFAULT_HEAT_SOURCE_AC_MIN_OUTDOOR))
+    hysteresis = float(room_config.get("heat_source_hysteresis", DEFAULT_HEAT_SOURCE_HYSTERESIS))
+    large_gap_multiplier = float(
+        room_config.get("heat_source_large_gap_multiplier", DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER)
+    )
+    secondary_power_scale = float(
+        room_config.get("heat_source_secondary_power_scale", DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE)
+    )
+    preference = room_config.get("heat_source_preference", DEFAULT_HEAT_SOURCE_PREFERENCE)
 
     delta_t = target_temp - current_temp
-
-    # Fixed roles: thermostats = primary, ACs = secondary
-    primary_devices: list[tuple[str, str]] = [(eid, "thermostat") for eid in thermostats]
-    secondary_devices: list[tuple[str, str]] = [(eid, "ac") for eid in acs]
 
     # Early exit: at or above target, no heating needed. A run in progress keeps its
     # sources instead: the controller deliberately heats at the target (min-run
@@ -182,31 +188,34 @@ def evaluate_heat_sources(
     stage1: list[tuple[str, str]] | None
     stage2: list[tuple[str, str]] | None
     if policy == HEAT_SOURCE_POLICY_HYDRONIC_FIRST:
-        stage1, stage2 = primary_devices, secondary_devices  # TRV, AC
+        stage1, stage2 = primary_devices, secondary_devices
     elif policy == HEAT_SOURCE_POLICY_AIR_FIRST:
-        stage1, stage2 = secondary_devices, primary_devices  # AC, TRV
+        stage1, stage2 = secondary_devices, primary_devices
     else:
         stage1, stage2 = None, None
 
     if stage1 is not None:
-        # Stage 1 only while heating is needed; stage 2 is fallback if stage 1 is gone.
-        # Timed join/drop: never use efficiency large-gap "both" for these policies.
+        # Timed join. Efficiency's outdoor crossover does not apply here.
         if delta_t <= 0:
             stage1_on = stage2_on = False
         elif stage1:
             stage1_on, stage2_on = True, False
             if stage2:
-                join_delta = room_config.get("heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA)
+                join_delta = float(room_config.get("heat_source_join_delta", DEFAULT_HEAT_SOURCE_JOIN_DELTA))
                 hold_s = (
-                    room_config.get(
-                        "heat_source_join_hold_minutes",
-                        DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
+                    float(
+                        room_config.get(
+                            "heat_source_join_hold_minutes",
+                            DEFAULT_HEAT_SOURCE_JOIN_HOLD_MINUTES,
+                        )
                     )
                     * 60
                 )
-                drop_h = room_config.get(
-                    "heat_source_drop_hysteresis",
-                    DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+                drop_h = float(
+                    room_config.get(
+                        "heat_source_drop_hysteresis",
+                        DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS,
+                    )
                 )
                 hold_elapsed = (
                     now_monotonic is not None
@@ -235,35 +244,31 @@ def evaluate_heat_sources(
         else:
             active = "none"
     else:
-        # Efficiency policy: weather + large-gap join (unchanged)
-        large_gap_threshold = primary_delta * HEAT_SOURCE_LARGE_GAP_MULTIPLIER
-
-        # Weather-based preference with hysteresis (None when no outdoor data available)
+        large_gap_threshold = primary_delta * large_gap_multiplier
         prefer_ac: bool | None
-        if outdoor_temp is not None:
+        if preference == "primary":
+            prefer_ac = False
+        elif outdoor_temp is not None:
             if previous_active_sources == "secondary":
-                # AC was active: keep unless outdoor drops below threshold - hysteresis
-                prefer_ac = outdoor_temp > outdoor_threshold - HEAT_SOURCE_HYSTERESIS
+                prefer_ac = outdoor_temp > outdoor_threshold - hysteresis
             elif previous_active_sources == "primary":
-                # Boiler was active: keep unless outdoor rises above threshold + hysteresis
-                prefer_ac = outdoor_temp > outdoor_threshold + HEAT_SOURCE_HYSTERESIS
+                prefer_ac = outdoor_temp > outdoor_threshold + hysteresis
             else:
                 prefer_ac = outdoor_temp > outdoor_threshold
         else:
             prefer_ac = None
 
-        # "both" when gap is large, or hysteresis holds "both" state
-        if delta_t >= large_gap_threshold + HEAT_SOURCE_HYSTERESIS:
+        if delta_t >= large_gap_threshold + hysteresis:
             active = "both"
-        elif previous_active_sources == "both" and delta_t > primary_delta - HEAT_SOURCE_HYSTERESIS:
+        elif previous_active_sources == "both" and delta_t > primary_delta - hysteresis:
             active = "both"
         elif prefer_ac is True:
             active = "secondary"
         elif prefer_ac is False:
             active = "primary"
         else:
-            # No outdoor data: delta-T heuristic (backward compatible)
-            active = "primary" if delta_t >= primary_delta + HEAT_SOURCE_HYSTERESIS else "secondary"
+            active = "primary" if delta_t >= primary_delta + hysteresis else "secondary"
+
 
     # Edge case: if chosen group has no devices, fall back
     if active == "secondary" and not secondary_devices:
@@ -311,7 +316,7 @@ def evaluate_heat_sources(
         is_active = active in ("secondary", "both")
         pf = power_fraction
         if active == "both":
-            pf = round(power_fraction * HEAT_SOURCE_SECONDARY_POWER_SCALE, 2)
+            pf = round(power_fraction * secondary_power_scale, 2)
         if not is_active:
             pf = 0.0
         commands.append(

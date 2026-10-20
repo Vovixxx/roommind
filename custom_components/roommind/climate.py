@@ -24,6 +24,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -47,8 +48,9 @@ from .const import (
     is_override_active,
 )
 from .control.mpc_controller import check_acs_can_heat
-from .coordinator import RoomMindCoordinator, _get_area_name
+from .coordinator import RoomMindCoordinator
 from .deprecation import warn_deprecated_use
+from .entity import _get_area_name, room_device_info, room_device_name
 from .utils.device_utils import get_ac_eids, get_trv_eids
 from .utils.schedule_utils import mask_override_band, next_schedule_change, override_preset_band
 
@@ -162,6 +164,7 @@ class RoomMindOverrideClimate(CoordinatorEntity, ClimateEntity):
     """Climate entity for room override control."""
 
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:thermometer-alert"
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
@@ -175,6 +178,11 @@ class RoomMindOverrideClimate(CoordinatorEntity, ClimateEntity):
         self._attr_name = f"{area_id} Override"
         self.entity_id = f"climate.{DOMAIN}_{area_id}_override"
         self._cancel_deferred_refresh: Callable[[], None] | None = None
+
+    @property
+    def device_info(self):
+        """Group this control on the zone device."""
+        return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
     async def async_will_remove_from_hass(self) -> None:
         self._drop_deferred_refresh()
@@ -363,6 +371,11 @@ class RoomMindRoomClimate(CoordinatorEntity, ClimateEntity):
         self._area_id = area_id
         self._attr_unique_id = f"{DOMAIN}_{area_id}_climate"
         self.entity_id = f"climate.{DOMAIN}_{area_id}"
+
+    @property
+    def device_info(self):
+        """This climate is the zone device the user controls."""
+        return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

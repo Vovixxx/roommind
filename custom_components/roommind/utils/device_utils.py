@@ -15,11 +15,15 @@ DEVICE_TYPE_AC = "ac"
 VALID_DEVICE_TYPES = {DEVICE_TYPE_TRV, DEVICE_TYPE_AC}
 
 DEVICE_ROLE_AUTO = "auto"
+DEVICE_ROLE_PRIMARY = "primary"
+DEVICE_ROLE_SECONDARY = "secondary"
+DEVICE_ROLE_COOL_ONLY = "cool_only"
+VALID_DEVICE_ROLES = {DEVICE_ROLE_AUTO, DEVICE_ROLE_PRIMARY, DEVICE_ROLE_SECONDARY, DEVICE_ROLE_COOL_ONLY}
 
-VALID_HEATING_SYSTEM_TYPES = {"", "radiator", "underfloor"}
+VALID_HEATING_SYSTEM_TYPES = {"", "radiator", "underfloor", "heat_pump"}
 
 # Heating system type priority: higher = longer residual heat tau
-HST_PRIORITY = {"underfloor": 2, "radiator": 1, "": 0}
+HST_PRIORITY = {"underfloor": 3, "radiator": 2, "heat_pump": 1, "": 0}
 
 IDLE_ACTION_OFF = "off"
 IDLE_ACTION_FAN_ONLY = "fan_only"
@@ -245,6 +249,32 @@ def get_trv_eids(devices: list[dict]) -> list[str]:
 def get_ac_eids(devices: list[dict]) -> list[str]:
     """Shortcut for get_entity_ids_by_type(devices, "ac")."""
     return get_entity_ids_by_type(devices, DEVICE_TYPE_AC)
+
+
+def heat_source_groups(devices: list[dict]) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Split devices into primary and secondary heaters.
+
+    ``role`` overrides the type default. ``auto`` keeps TRV as primary and AC as
+    secondary. ``cool_only`` is left out of heating.
+    """
+    primary: list[tuple[str, str]] = []
+    secondary: list[tuple[str, str]] = []
+    for device in devices:
+        entity_id = device.get("entity_id")
+        if not entity_id:
+            continue
+        dtype = device.get("type")
+        role = device.get("role") or DEVICE_ROLE_AUTO
+        if role not in VALID_DEVICE_ROLES:
+            role = DEVICE_ROLE_AUTO
+        if role == DEVICE_ROLE_COOL_ONLY:
+            continue
+        kind = "thermostat" if dtype == DEVICE_TYPE_TRV else "ac"
+        if role == DEVICE_ROLE_PRIMARY or (role == DEVICE_ROLE_AUTO and dtype == DEVICE_TYPE_TRV):
+            primary.append((entity_id, kind))
+        elif role == DEVICE_ROLE_SECONDARY or (role == DEVICE_ROLE_AUTO and dtype == DEVICE_TYPE_AC):
+            secondary.append((entity_id, kind))
+    return primary, secondary
 
 
 def get_device_by_eid(devices: list[dict], entity_id: str) -> dict | None:

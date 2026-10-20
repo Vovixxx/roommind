@@ -29,6 +29,7 @@ from custom_components.roommind.utils.device_utils import (
     get_setpoint_offsets,
     get_trv_eids,
     has_reliable_hvac_modes,
+    heat_source_groups,
     is_ac_type,
     is_trv_type,
     legacy_to_devices,
@@ -51,8 +52,20 @@ def test_device_role_auto_constant():
     assert DEVICE_ROLE_AUTO == "auto"
 
 
+def test_heat_source_groups_roles():
+    devices = [
+        {"entity_id": "climate.floor", "type": "trv", "role": "primary"},
+        {"entity_id": "climate.split", "type": "ac", "role": "secondary"},
+        {"entity_id": "climate.cool", "type": "ac", "role": "cool_only"},
+        {"entity_id": "climate.swapped", "type": "ac", "role": "primary"},
+    ]
+    primary, secondary = heat_source_groups(devices)
+    assert primary == [("climate.floor", "thermostat"), ("climate.swapped", "ac")]
+    assert secondary == [("climate.split", "ac")]
+
+
 def test_valid_heating_system_types():
-    assert VALID_HEATING_SYSTEM_TYPES == {"", "radiator", "underfloor"}
+    assert VALID_HEATING_SYSTEM_TYPES == {"", "radiator", "underfloor", "heat_pump"}
 
 
 # ---------------------------------------------------------------------------

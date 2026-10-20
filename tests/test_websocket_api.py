@@ -1922,13 +1922,14 @@ def test_save_room_heating_system_type_invalid_rejected():
     import voluptuous as vol
 
     # Test the vol.In validator directly (matches the schema in websocket_api.py)
-    validator = vol.In(["", "radiator", "underfloor"])
+    validator = vol.In(["", "radiator", "underfloor", "heat_pump"])
     with pytest.raises(vol.Invalid):
         validator("geothermal")
     # Valid values should pass
     assert validator("") == ""
     assert validator("radiator") == "radiator"
     assert validator("underfloor") == "underfloor"
+    assert validator("heat_pump") == "heat_pump"
 
 
 @pytest.mark.asyncio

@@ -6,11 +6,13 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import RoomMindCoordinator
+from .entity import room_device_info, room_device_name
 
 
 def _create_room_entities(coordinator: RoomMindCoordinator, area_id: str) -> list[SensorEntity]:
@@ -47,6 +49,7 @@ class _RoomMindBaseSensor(CoordinatorEntity, SensorEntity):
     """Base class for all RoomMind room sensors."""
 
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _data_key: str  # Key in the room state dict (e.g. "current_temp")
 
     def __init__(
@@ -62,6 +65,11 @@ class _RoomMindBaseSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{area_id}_{suffix}"
         self._attr_name = f"{area_id} {name_label}"
         self.entity_id = f"sensor.{DOMAIN}_{area_id}_{suffix}"
+
+    @property
+    def device_info(self):
+        """Attach helper sensors to the zone device."""
+        return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
     @property
     def native_value(self) -> float | str | None:

@@ -385,7 +385,9 @@ export class RsDeviceSection extends LitElement {
                         ? localize("devices.system_type_radiator", this.hass.language)
                         : this._heatingSystemType === "underfloor"
                           ? localize("devices.system_type_underfloor", this.hass.language)
-                          : this._heatingSystemType
+                          : this._heatingSystemType === "heat_pump"
+                            ? localize("devices.system_type_heat_pump", this.hass.language)
+                            : this._heatingSystemType
                     }</span
                   >
                 </div>
@@ -428,7 +430,8 @@ export class RsDeviceSection extends LitElement {
       device?.idle_action === "low";
     const hasValve =
       device?.type === "trv" && !!device?.valve_opening_entity && !!device?.valve_closing_entity;
-    const showFollowBadge = device?.setpoint_mode === "follow" && !!this.selectedTempSensor && !hasValve;
+    const showFollowBadge =
+      device?.setpoint_mode === "follow" && !!this.selectedTempSensor && !hasValve;
     const showDirectBadge =
       device?.setpoint_mode === "direct" && !!this.selectedTempSensor && !hasValve;
     const showValveBadge = hasValve && !!this.selectedTempSensor;
@@ -481,6 +484,20 @@ export class RsDeviceSection extends LitElement {
                 <ha-icon icon="mdi:shield-off-outline"></ha-icon>
                 ${localize("devices.valve_protection_excluded", this.hass.language)}
               </span>`
+            : nothing
+        }
+        ${
+          device && device.role && device.role !== "auto"
+            ? html`<span class="valve-exclude-badge"
+                >${localize(`devices.heat_role_${device.role}`, this.hass.language)}</span
+              >`
+            : nothing
+        }
+        ${
+          device?.heating_system_type === "heat_pump"
+            ? html`<span class="valve-exclude-badge"
+                >${localize("devices.behaviour_heat_pump", this.hass.language)}</span
+              >`
             : nothing
         }
         ${displayValue ? html`<span class="view-value">${displayValue}</span>` : nothing}
@@ -587,6 +604,10 @@ export class RsDeviceSection extends LitElement {
                       value: "underfloor",
                       label: localize("devices.system_type_underfloor", this.hass.language),
                     },
+                    {
+                      value: "heat_pump",
+                      label: localize("devices.system_type_heat_pump", this.hass.language),
+                    },
                   ]}
                   @selected=${this._onHeatingSystemTypeChange}
                   @closed=${(e: Event) => e.stopPropagation()}
@@ -601,6 +622,9 @@ export class RsDeviceSection extends LitElement {
                   >
                   <ha-list-item value="underfloor"
                     >${localize("devices.system_type_underfloor", this.hass.language)}</ha-list-item
+                  >
+                  <ha-list-item value="heat_pump"
+                    >${localize("devices.system_type_heat_pump", this.hass.language)}</ha-list-item
                   >
                 </ha-select>
                 ${
@@ -753,6 +777,86 @@ export class RsDeviceSection extends LitElement {
           >
           <ha-list-item value="ac">${localize("devices.type_ac", lang)}</ha-list-item>
         </ha-select>
+      </div>
+
+      <div class="detail-field with-info">
+        <ha-select
+          .label=${localize("devices.heat_role", lang)}
+          .value=${device.role ?? "auto"}
+          .options=${[
+            { value: "auto", label: localize("devices.heat_role_auto", lang) },
+            { value: "primary", label: localize("devices.heat_role_primary", lang) },
+            { value: "secondary", label: localize("devices.heat_role_secondary", lang) },
+            { value: "cool_only", label: localize("devices.heat_role_cool_only", lang) },
+          ]}
+          @selected=${(e: Event) => this._onHeatRoleChange(entityId, getSelectValue(e))}
+          @closed=${(e: Event) => e.stopPropagation()}
+          fixedMenuPosition
+        >
+          <ha-list-item value="auto">${localize("devices.heat_role_auto", lang)}</ha-list-item>
+          <ha-list-item value="primary"
+            >${localize("devices.heat_role_primary", lang)}</ha-list-item
+          >
+          <ha-list-item value="secondary"
+            >${localize("devices.heat_role_secondary", lang)}</ha-list-item
+          >
+          <ha-list-item value="cool_only"
+            >${localize("devices.heat_role_cool_only", lang)}</ha-list-item
+          >
+        </ha-select>
+        <rs-info-icon .text=${localize("devices.heat_role_hint", lang)}></rs-info-icon>
+      </div>
+
+      <div class="detail-field with-info">
+        <ha-select
+          .label=${localize("devices.behaviour", lang)}
+          .value=${device.heating_system_type || "standard"}
+          .options=${[
+            { value: "standard", label: localize("devices.behaviour_standard", lang) },
+            ...(isThermostat
+              ? [
+                  { value: "radiator", label: localize("devices.system_type_radiator", lang) },
+                  { value: "underfloor", label: localize("devices.system_type_underfloor", lang) },
+                ]
+              : []),
+            {
+              value: "heat_pump",
+              label: localize(
+                isAc ? "devices.behaviour_heat_pump" : "devices.system_type_heat_pump",
+                lang,
+              ),
+            },
+          ]}
+          @selected=${(e: Event) => this._onDeviceHeatingTypeChange(entityId, getSelectValue(e))}
+          @closed=${(e: Event) => e.stopPropagation()}
+          fixedMenuPosition
+        >
+          <ha-list-item value="standard"
+            >${localize("devices.behaviour_standard", lang)}</ha-list-item
+          >
+          ${
+            isThermostat
+              ? html`
+                  <ha-list-item value="radiator"
+                    >${localize("devices.system_type_radiator", lang)}</ha-list-item
+                  >
+                  <ha-list-item value="underfloor"
+                    >${localize("devices.system_type_underfloor", lang)}</ha-list-item
+                  >
+                `
+              : nothing
+          }
+          ${
+            isAc
+              ? html`<ha-list-item value="heat_pump"
+                  >${localize("devices.behaviour_heat_pump", lang)}</ha-list-item
+                >`
+              : html`<ha-list-item value="heat_pump"
+                  >${localize("devices.system_type_heat_pump", lang)}</ha-list-item
+                >`
+          }
+        </ha-select>
+        <rs-info-icon .text=${localize("devices.behaviour_hint", lang)}></rs-info-icon>
       </div>
 
       ${
@@ -1192,6 +1296,9 @@ export class RsDeviceSection extends LitElement {
       if (deviceType === "ac") {
         delete updated.valve_opening_entity;
         delete updated.valve_closing_entity;
+        if (updated.heating_system_type && updated.heating_system_type !== "heat_pump") {
+          updated.heating_system_type = "";
+        }
       }
       return updated;
     });
@@ -1346,6 +1453,25 @@ export class RsDeviceSection extends LitElement {
         else delete updated.valve_closing_entity;
         return updated;
       }),
+    );
+  }
+
+  private _onHeatRoleChange(entityId: string, value: string | undefined) {
+    if (value !== "auto" && value !== "primary" && value !== "secondary" && value !== "cool_only") {
+      return;
+    }
+    this._fireDeviceChanged(
+      this.devices.map((d) => (d.entity_id === entityId ? { ...d, role: value } : d)),
+    );
+  }
+
+  private _onDeviceHeatingTypeChange(entityId: string, value: string | undefined) {
+    if (!value) return;
+    const heating = value === "standard" ? "" : value;
+    this._fireDeviceChanged(
+      this.devices.map((d) =>
+        d.entity_id === entityId ? { ...d, heating_system_type: heating } : d,
+      ),
     );
   }
 
