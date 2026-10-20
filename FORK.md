@@ -49,3 +49,19 @@ Do not duplicate upstream PRs [#425](https://github.com/snazzybean/roommind/pull
 - Extra plant types, dual heads, or an equipment graph (unless the user explicitly asks).
 
 Hydronic-first + timed join for 1:1 is implemented; it is not deferred until the live trial.
+
+## What this fork adds
+
+Upstream RoomMind is unchanged when the new options are left at their defaults. Efficiency staging, proportional and direct setpoints, valve control, the compressor min-run, and the MPC optimizer are the upstream code. The fork adds:
+
+| Piece | What it does | What it does not change |
+| --- | --- | --- |
+| Hydronic first / air first | The plant runs first. The backup joins only after the wait and only while the room is still short. | Efficiency, the default, still uses the outdoor crossover and the gap. |
+| Staging knobs | Hysteresis, backup-gap multiplier, and backup power scale were hardcoded. They are now room settings, with the old numbers as defaults. | At those defaults the efficiency decision matches upstream. |
+| Follow | Shifts the room error into the device's own sensor, then adds the same setpoint offset Direct uses. | Proportional devices ignore the offset. |
+| One zone device | The room climate and its helpers share one Home Assistant device. The old override climate is no longer created. Holds stay on the zone climate. | |
+| Heat switch | `switch` can be an electric heater, radiant floor, radiator, or boiler. It is turned on and off. It is not sent climate services. | A room with no switch never calls `switch.turn_on`. |
+| Boiler profile | A boiler switch holds on for 10 minutes. A heat-pump backup uses the 15 minute profile instead of the floor's 30. | The compressor group is still the shared outdoor-unit lock. It is not replaced by the boiler profile. |
+| Unit | The zone climate, target sensor, heat-source card, and cover thresholds follow Celsius or Fahrenheit. Storage stays Celsius. | |
+
+Heating behaviour is set on each device. The old room-wide "Heating system type" control wrote the same field onto every thermostat, so it is gone. A saved primary or backup role still wins if it is already stored. The picker is not in the device screen. With role left on automatic, a thermostat or heat switch is the plant and a climate that can heat is the backup.

@@ -5,7 +5,6 @@ import { getEntitiesForArea } from "../utils/room-state";
 import { localize } from "../utils/localize";
 import { getSelectValue, openEntityInfo } from "../utils/events";
 import { tempUnit, toDisplayDelta, toCelsiusDelta, usesFahrenheit } from "../utils/temperature";
-import { resolveHeatingSystemType } from "../utils/device-utils";
 import { masterDetailStyles } from "../styles/master-detail-styles";
 import { inputStyles } from "../styles/input-styles";
 import "./shared/rs-master-detail";
@@ -36,11 +35,8 @@ export class RsDeviceSection extends LitElement {
   @property({ type: String }) public coilDryFanModeGlobal = "low";
 
   @property({ type: Boolean }) public editing = false;
-  @state() private _systemTypeInfoExpanded = false;
-  @state() private _showBoostHint = false;
   @state() private _selectedThermostats: Set<string> = new Set();
   @state() private _selectedCoolingDevices: Set<string> = new Set();
-  @state() private _heatingSystemType = "";
   @state() private _selectedForEdit = "";
 
   protected willUpdate(changed: PropertyValues): void {
@@ -51,7 +47,6 @@ export class RsDeviceSection extends LitElement {
       this._selectedCoolingDevices = new Set(
         this.devices.filter((d) => d.type === "ac").map((d) => d.entity_id),
       );
-      this._heatingSystemType = resolveHeatingSystemType(this.devices);
 
       // Keep _selectedForEdit valid: clear if device was removed,
       // auto-select first device when nothing is selected.
@@ -381,30 +376,6 @@ export class RsDeviceSection extends LitElement {
             `
           : nothing
       }
-      ${
-        this._heatingSystemType
-          ? html`
-              <div class="device-group">
-                <div class="section-subtitle">
-                  ${localize("devices.heating_system_type", this.hass.language)}
-                </div>
-                <div class="view-row">
-                  <span class="view-name"
-                    >${
-                      this._heatingSystemType === "radiator"
-                        ? localize("devices.system_type_radiator", this.hass.language)
-                        : this._heatingSystemType === "underfloor"
-                          ? localize("devices.system_type_underfloor", this.hass.language)
-                          : this._heatingSystemType === "heat_pump"
-                            ? localize("devices.system_type_heat_pump", this.hass.language)
-                            : this._heatingSystemType
-                    }</span
-                  >
-                </div>
-              </div>
-            `
-          : nothing
-      }
     `;
   }
 
@@ -586,90 +557,6 @@ export class RsDeviceSection extends LitElement {
           }
         </div>
       </rs-master-detail>
-
-      ${
-        this._selectedThermostats.size > 0
-          ? html`
-              <div class="block-divider"></div>
-              <div class="block">
-                <div class="subtitle-row">
-                  <div class="section-subtitle">
-                    ${localize("devices.heating_system_type", this.hass.language)}
-                  </div>
-                  <ha-icon
-                    class="info-icon ${this._systemTypeInfoExpanded ? "info-active" : ""}"
-                    icon="mdi:information-outline"
-                    @click=${() => {
-                      this._systemTypeInfoExpanded = !this._systemTypeInfoExpanded;
-                    }}
-                  ></ha-icon>
-                </div>
-                ${
-                  this._systemTypeInfoExpanded
-                    ? html`
-                        <div class="system-type-info">
-                          ${localize("devices.heating_system_type_info", this.hass.language)}
-                        </div>
-                      `
-                    : nothing
-                }
-                <ha-select
-                  .value=${this._heatingSystemType || "standard"}
-                  .options=${[
-                    {
-                      value: "standard",
-                      label: localize("devices.system_type_none", this.hass.language),
-                    },
-                    {
-                      value: "radiator",
-                      label: localize("devices.system_type_radiator", this.hass.language),
-                    },
-                    {
-                      value: "underfloor",
-                      label: localize("devices.system_type_underfloor", this.hass.language),
-                    },
-                    {
-                      value: "heat_pump",
-                      label: localize("devices.system_type_heat_pump", this.hass.language),
-                    },
-                  ]}
-                  @selected=${this._onHeatingSystemTypeChange}
-                  @closed=${(e: Event) => e.stopPropagation()}
-                  fixedMenuPosition
-                  style="width: 100%;"
-                >
-                  <ha-list-item value="standard"
-                    >${localize("devices.system_type_none", this.hass.language)}</ha-list-item
-                  >
-                  <ha-list-item value="radiator"
-                    >${localize("devices.system_type_radiator", this.hass.language)}</ha-list-item
-                  >
-                  <ha-list-item value="underfloor"
-                    >${localize("devices.system_type_underfloor", this.hass.language)}</ha-list-item
-                  >
-                  <ha-list-item value="heat_pump"
-                    >${localize("devices.system_type_heat_pump", this.hass.language)}</ha-list-item
-                  >
-                </ha-select>
-                ${
-                  this._showBoostHint
-                    ? html`
-                        <div class="boost-hint">
-                          <ha-icon icon="mdi:information-outline"></ha-icon>
-                          <span
-                            >${localize(
-                              "devices.heating_system_type_boost_hint",
-                              this.hass.language,
-                            )}</span
-                          >
-                        </div>
-                      `
-                    : nothing
-                }
-              </div>
-            `
-          : nothing
-      }
     `;
   }
 
@@ -1507,16 +1394,6 @@ export class RsDeviceSection extends LitElement {
         d.entity_id === entityId ? { ...d, heating_system_type: heating } : d,
       ),
     );
-  }
-
-  private _onHeatingSystemTypeChange(e: Event) {
-    const raw = getSelectValue(e) ?? "";
-    const value = raw === "standard" ? "" : raw;
-    this._showBoostHint = true;
-    const newDevices = this.devices.map((d) =>
-      d.type === "trv" ? { ...d, heating_system_type: value } : d,
-    );
-    this._fireDeviceChanged(newDevices);
   }
 
   private _fireDeviceChanged(devices: DeviceConfig[]) {

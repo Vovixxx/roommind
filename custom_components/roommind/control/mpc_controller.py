@@ -2228,7 +2228,8 @@ class MPCController:
         if mode == MODE_HEATING and heat_source_plan is not None:
             # Orchestrated heating: route power to specific devices per plan
             for cmd in heat_source_plan.commands:
-                if cmd.entity_id in _exclude:
+                if cmd.entity_id in _exclude or cmd.entity_id in self._switches:
+                    # Switches are turned on and off by _async_apply_heat_switches.
                     continue
                 if cmd.entity_id in _forced_on and not cmd.active:
                     # Compressor min-run: the plan parked a device that must keep

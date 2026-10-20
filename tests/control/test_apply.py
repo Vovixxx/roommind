@@ -20,6 +20,7 @@ from custom_components.roommind.control.mpc_controller import (
     resolve_hvac_mode,
 )
 from custom_components.roommind.control.thermal_model import RoomModelManager
+from custom_components.roommind.managers.heat_source_orchestrator import DeviceCommand, HeatSourcePlan
 
 from .conftest import build_hass, make_room
 
@@ -4567,6 +4568,43 @@ async def test_boiler_switch_stays_on_for_its_minimum_run():
     hass.services.async_call.reset_mock()
     await ctrl.async_apply("idle", 21.0, current_temp=21.0)
     assert any(c[0][0] == "switch" and c[0][1] == "turn_off" for c in hass.services.async_call.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_orchestrated_switch_is_not_commanded_as_a_climate():
+    """A heat switch is switched on. It is not sent climate.set_temperature."""
+    hass = build_hass()
+    room = make_room(thermostats=["climate.floor"], acs=["climate.split"])
+    room["devices"] = [
+        {"entity_id": "climate.floor", "type": "trv", "role": "auto", "heating_system_type": "underfloor"},
+        {"entity_id": "switch.floor", "type": "switch", "role": "auto", "heating_system_type": "underfloor"},
+        {"entity_id": "climate.split", "type": "ac", "role": "auto", "heating_system_type": "heat_pump"},
+    ]
+    plan = HeatSourcePlan(
+        commands=[
+            DeviceCommand("switch.floor", "primary", "thermostat", True, 1.0, "active"),
+            DeviceCommand("climate.split", "secondary", "ac", False, 0.0, "off"),
+        ],
+        active_sources="primary",
+        reason="test",
+    )
+    ctrl = MPCController(
+        hass,
+        room,
+        model_manager=RoomModelManager(),
+        outdoor_temp=5.0,
+        settings={},
+        has_external_sensor=True,
+    )
+    await ctrl.async_apply("heating", 21.0, current_temp=19.0, heat_source_plan=plan)
+    climate_targets = [
+        c[0][2].get("entity_id") for c in hass.services.async_call.call_args_list if c[0][0] == "climate"
+    ]
+    assert "switch.floor" not in climate_targets
+    assert any(
+        c[0][0] == "switch" and c[0][1] == "turn_on" and c[0][2].get("entity_id") == "switch.floor"
+        for c in hass.services.async_call.call_args_list
+    )
 
 
 @pytest.mark.asyncio
