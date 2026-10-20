@@ -986,14 +986,23 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 and targets.heat is not None
                 and self.outdoor_temp_effective is not None
             ):
-                coast = self._model_manager.get_model(area_id).predict(
+                model = self._model_manager.get_model(area_id)
+                plant = room.get("heating_system_type") or ""
+                learned = self._source_behavior.rate(plant) if plant else None
+                coast = model.predict(
                     current_temp,
                     self.outdoor_temp_effective,
                     0.0,
                     30.0,
                     q_residual=q_residual,
                 )
-                plant_cannot_hold = coast < targets.heat - 0.3
+                holding = model.predict(
+                    current_temp,
+                    self.outdoor_temp_effective,
+                    learned if learned is not None else model.Q_heat,
+                    30.0,
+                )
+                plant_cannot_hold = coast < targets.heat - 0.3 or holding < targets.heat - 0.3
             heat_source_plan = evaluate_heat_sources(
                 room_config=room,
                 mode=mode,
