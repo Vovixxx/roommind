@@ -29,7 +29,6 @@ export class RsHeatSourceSection extends LitElement {
   @property({ type: Number }) public hysteresis = 0.3;
   @property({ type: Number }) public largeGapMultiplier = 2.0;
   @property({ type: Number }) public secondaryPowerScale = 0.7;
-  @property() public preference: "outdoor" | "primary" = "outdoor";
   @property({ type: Boolean }) public editing = false;
 
   static styles = [
@@ -173,6 +172,12 @@ export class RsHeatSourceSection extends LitElement {
           <strong
             >${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong
           >
+          · ${localize("heat_source.hysteresis", lang)}:
+          <strong>${this.hysteresis}${localize("heat_source.primary_delta_suffix", lang)}</strong>
+          · ${localize("heat_source.large_gap_multiplier", lang)}:
+          <strong>${this.largeGapMultiplier}×</strong>
+          · ${localize("heat_source.secondary_power_scale", lang)}:
+          <strong>${this.secondaryPowerScale}</strong>
         </div>`;
       }
       return html`<div class="summary">
@@ -186,17 +191,8 @@ export class RsHeatSourceSection extends LitElement {
         >
         · ${localize("heat_source.ac_min_outdoor", lang)}:
         <strong>${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong>
-        · ${localize("heat_source.preference", lang)}:
-        <strong
-          >${localize(
-            this.preference === "primary"
-              ? "heat_source.preference_primary"
-              : "heat_source.preference_outdoor",
-            lang,
-          )}</strong
-        >
-        · ${localize("heat_source.large_gap_multiplier", lang)}:
-        <strong>${this.largeGapMultiplier}×</strong>
+        · ${localize("heat_source.secondary_power_scale", lang)}:
+        <strong>${this.secondaryPowerScale}</strong>
       </div>`;
     }
 
@@ -292,16 +288,7 @@ export class RsHeatSourceSection extends LitElement {
                           step: 0.1,
                           key: "heat_source_large_gap_multiplier",
                         })}
-                        ${this._renderThresholdCell({
-                          label: localize("heat_source.secondary_power_scale", lang),
-                          hint: localize("heat_source.secondary_power_scale_hint", lang),
-                          suffix: "",
-                          value: this.secondaryPowerScale,
-                          min: 0.1,
-                          max: 1,
-                          step: 0.05,
-                          key: "heat_source_secondary_power_scale",
-                        })}
+                        ${this._renderSecondaryPowerCell(lang)}
                         ${this._renderAcMinOutdoorCell(lang)}
                       `
                     : html`
@@ -335,6 +322,7 @@ export class RsHeatSourceSection extends LitElement {
                           step: 0.1,
                           key: "heat_source_drop_hysteresis",
                         })}
+                        ${this._renderSecondaryPowerCell(lang)}
                         ${this._renderAcMinOutdoorCell(lang)}
                       `
                 }
@@ -348,6 +336,19 @@ export class RsHeatSourceSection extends LitElement {
   private _normalizedPolicy(): HeatSourcePolicy {
     if (this.policy === "hydronic_first" || this.policy === "air_first") return this.policy;
     return "efficiency";
+  }
+
+  private _renderSecondaryPowerCell(lang: string) {
+    return this._renderThresholdCell({
+      label: localize("heat_source.secondary_power_scale", lang),
+      hint: localize("heat_source.secondary_power_scale_hint", lang),
+      suffix: "",
+      value: this.secondaryPowerScale,
+      min: 0.1,
+      max: 1,
+      step: 0.05,
+      key: "heat_source_secondary_power_scale",
+    });
   }
 
   private _renderAcMinOutdoorCell(lang: string) {

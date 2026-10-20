@@ -5,8 +5,8 @@ and ACs with heating capability (heat pumps), this module decides which devices
 to activate based on temperature gap (delta-T) and outdoor temperature.
 
 A device role of primary, secondary, or cool_only overrides the type default
-(thermostat primary, AC secondary). Preference "primary" keeps the floor on
-unless the gap is large enough for both.
+(thermostat primary, AC secondary). Hydronic-first and air-first use the timed
+join. Efficiency keeps the outdoor crossover.
 
 The orchestrator sits between the MPC optimizer output (abstract mode + power_fraction)
 and the device command layer (async_apply). It does NOT modify the thermal model or
@@ -29,7 +29,6 @@ from ..const import (
     DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER,
     DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD,
     DEFAULT_HEAT_SOURCE_POLICY,
-    DEFAULT_HEAT_SOURCE_PREFERENCE,
     DEFAULT_HEAT_SOURCE_PRIMARY_DELTA,
     DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE,
     HEAT_SOURCE_POLICY_AIR_FIRST,
@@ -128,7 +127,6 @@ def evaluate_heat_sources(
     secondary_power_scale = float(
         room_config.get("heat_source_secondary_power_scale", DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE)
     )
-    preference = room_config.get("heat_source_preference", DEFAULT_HEAT_SOURCE_PREFERENCE)
 
     delta_t = target_temp - current_temp
 
@@ -246,9 +244,7 @@ def evaluate_heat_sources(
     else:
         large_gap_threshold = primary_delta * large_gap_multiplier
         prefer_ac: bool | None
-        if preference == "primary":
-            prefer_ac = False
-        elif outdoor_temp is not None:
+        if outdoor_temp is not None:
             if previous_active_sources == "secondary":
                 prefer_ac = outdoor_temp > outdoor_threshold - hysteresis
             elif previous_active_sources == "primary":

@@ -155,7 +155,6 @@ _ROOM_SAVE_FIELDS = (
     "heat_source_hysteresis",
     "heat_source_large_gap_multiplier",
     "heat_source_secondary_power_scale",
-    "heat_source_preference",
     "valve_protection_exclude",
     "climate_control_enabled",
 )
@@ -459,7 +458,6 @@ async def websocket_list_rooms(
         vol.Optional("heat_source_hysteresis"): vol.All(vol.Coerce(float), vol.Range(min=0, max=2)),
         vol.Optional("heat_source_large_gap_multiplier"): vol.All(vol.Coerce(float), vol.Range(min=1, max=8)),
         vol.Optional("heat_source_secondary_power_scale"): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=1)),
-        vol.Optional("heat_source_preference"): vol.In(["outdoor", "primary"]),
         vol.Optional("climate_control_enabled"): bool,
     }
 )

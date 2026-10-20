@@ -21,7 +21,6 @@ from .const import (
     DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER,
     DEFAULT_HEAT_SOURCE_OUTDOOR_THRESHOLD,
     DEFAULT_HEAT_SOURCE_POLICY,
-    DEFAULT_HEAT_SOURCE_PREFERENCE,
     DEFAULT_HEAT_SOURCE_PRIMARY_DELTA,
     DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE,
     DOMAIN,
@@ -310,7 +309,6 @@ class RoomMindStore:
             "heat_source_secondary_power_scale": config.get(
                 "heat_source_secondary_power_scale", DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE
             ),
-            "heat_source_preference": config.get("heat_source_preference", DEFAULT_HEAT_SOURCE_PREFERENCE),
             "climate_control_enabled": config.get("climate_control_enabled", True),
         }
         _single_temps_to_cool_side(room, config, room["climate_mode"])

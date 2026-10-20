@@ -74,7 +74,6 @@ export interface ScheduleTempWarning {
 
 export type DeviceType = "trv" | "ac";
 export type DeviceRole = "primary" | "secondary" | "cool_only" | "auto";
-export type HeatSourcePreference = "outdoor" | "primary";
 
 export interface DeviceConfig {
   entity_id: string;
@@ -164,7 +163,6 @@ export interface RoomConfig {
   heat_source_hysteresis?: number;
   heat_source_large_gap_multiplier?: number;
   heat_source_secondary_power_scale?: number;
-  heat_source_preference?: HeatSourcePreference;
   climate_control_enabled?: boolean;
   live?: RoomLiveData;
 }

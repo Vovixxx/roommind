@@ -551,22 +551,10 @@ class TestEvaluateHeatSources:
         assert result is not None
         assert result.active_sources == "secondary"
 
-    def test_primary_preference_keeps_floor_in_mild_weather(self):
-        """Floor-first ignores a mild outdoor temperature until the gap is large."""
-        hass = _make_hass(["heat", "cool"])
-        room = _make_room(primary_delta=1.5, outdoor_threshold=5.0)
-        room["heat_source_preference"] = "primary"
-        result = evaluate_heat_sources(room, MODE_HEATING, 0.7, 19.0, 21.0, 12.0, "none", hass)
-
-        assert result is not None
-        assert result.active_sources == "primary"
-        assert result.commands[0].active
-        assert not result.commands[1].active
-
-    def test_primary_preference_large_gap_still_adds_backup(self):
+    def test_large_gap_adds_backup_even_in_mild_weather(self):
+        """Efficiency still joins both when the gap reaches the multiplier, outdoors aside."""
         hass = _make_hass(["heat", "cool"])
         room = _make_room(primary_delta=1.5)
-        room["heat_source_preference"] = "primary"
         room["heat_source_large_gap_multiplier"] = 2.0
         result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, 12.0, "none", hass)
 
@@ -574,11 +562,11 @@ class TestEvaluateHeatSources:
         assert result.active_sources == "both"
 
     def test_raised_multiplier_holds_the_backup_off(self):
+        """A higher multiplier keeps the backup off while the outdoor rule stays on the floor."""
         hass = _make_hass(["heat", "cool"])
         room = _make_room(primary_delta=1.5)
-        room["heat_source_preference"] = "primary"
         room["heat_source_large_gap_multiplier"] = 4.0
-        result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, 12.0, "none", hass)
+        result = evaluate_heat_sources(room, MODE_HEATING, 0.8, 17.0, 21.0, 0.0, "none", hass)
 
         assert result is not None
         assert result.active_sources == "primary"

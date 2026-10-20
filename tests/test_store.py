@@ -429,7 +429,6 @@ async def test_save_room_defaults_heat_source_orchestration(store):
     assert room["heat_source_hysteresis"] == 0.3
     assert room["heat_source_large_gap_multiplier"] == 2.0
     assert room["heat_source_secondary_power_scale"] == 0.7
-    assert room["heat_source_preference"] == "outdoor"
 
 
 @pytest.mark.asyncio

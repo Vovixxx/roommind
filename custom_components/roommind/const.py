@@ -228,7 +228,6 @@ DEFAULT_HEAT_SOURCE_DROP_HYSTERESIS = 0.3  # °C ≈ 0.5°F
 DEFAULT_HEAT_SOURCE_HYSTERESIS = 0.3  # °C hysteresis band to prevent oscillation
 DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER = 2.0  # both sources when gap > primary_delta * this
 DEFAULT_HEAT_SOURCE_SECONDARY_POWER_SCALE = 0.7  # throttle secondary when both are active
-DEFAULT_HEAT_SOURCE_PREFERENCE = "outdoor"  # outdoor | primary
 # Aliases kept for existing imports. Room config overrides these when set.
 HEAT_SOURCE_HYSTERESIS = DEFAULT_HEAT_SOURCE_HYSTERESIS
 HEAT_SOURCE_LARGE_GAP_MULTIPLIER = DEFAULT_HEAT_SOURCE_LARGE_GAP_MULTIPLIER
