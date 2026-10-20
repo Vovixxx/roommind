@@ -65,7 +65,7 @@ class RoomMindCoverAutoSwitch(CoordinatorEntity, SwitchEntity):
         self.entity_id = f"switch.{DOMAIN}_{area_id}_cover_auto"
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Attach this switch to the zone device."""
         return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
@@ -102,7 +102,7 @@ class RoomMindClimateControlSwitch(CoordinatorEntity, SwitchEntity):
         self.entity_id = f"switch.{DOMAIN}_{area_id}_climate_control"
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Attach this switch to the zone device."""
         return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
@@ -138,7 +138,7 @@ class RoomMindVacationSwitch(CoordinatorEntity, SwitchEntity):
         self.entity_id = f"switch.{DOMAIN}_vacation"
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """House-level switch, separate from a zone device."""
         return DeviceInfo(
             identifiers={(DOMAIN, "hub")},

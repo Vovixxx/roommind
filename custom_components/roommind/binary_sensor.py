@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -56,7 +56,7 @@ class RoomMindCoverPausedSensor(CoordinatorEntity, BinarySensorEntity):
         self.entity_id = f"binary_sensor.{DOMAIN}_{area_id}_cover_paused"
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Attach this sensor to the zone device."""
         return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 

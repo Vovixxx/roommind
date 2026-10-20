@@ -24,7 +24,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -180,7 +180,7 @@ class RoomMindOverrideClimate(CoordinatorEntity, ClimateEntity):
         self._cancel_deferred_refresh: Callable[[], None] | None = None
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Group this control on the zone device."""
         return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
@@ -373,7 +373,7 @@ class RoomMindRoomClimate(CoordinatorEntity, ClimateEntity):
         self.entity_id = f"climate.{DOMAIN}_{area_id}"
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """This climate is the zone device the user controls."""
         return room_device_info(self._area_id, room_device_name(self.coordinator, self._area_id))
 
