@@ -610,6 +610,6 @@
   "devices.behaviour": "Heating behaviour",
   "devices.behaviour_standard": "Standard",
   "devices.behaviour_heat_pump": "Heat pump",
-  "devices.behaviour_hint": "This is what the device is. A floor, boiler, radiator, or electric heater is the plant. A climate that can heat is the backup. A boiler keeps a 10 minute minimum run, a heat pump 15, a floor the long residual-heat profile.",
+  "devices.behaviour_hint": "This is what the device is. A floor, boiler, radiator, or electric heater is the plant. A climate that can heat is the backup. Heat-pump heat stores about as little as an electric heater, and still holds 15 minutes so the compressor does not short-cycle. A floor keeps the long residual-heat profile.",
   "devices.valve_closing_entity_hint": "Keeps the valve at the set opening whatever the thermostat's own control wants. Filled in automatically when the device has one."
 }

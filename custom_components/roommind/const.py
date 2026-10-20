@@ -170,9 +170,11 @@ HEATING_SYSTEM_PROFILES: dict[str, dict[str, float]] = {
         "min_run_minutes": 30.0,
     },
     "heat_pump": {
-        "tau_minutes": 10.0,
-        "initial_fraction": 0.2,
-        "tau_charge_minutes": 8.0,
+        # Heating is forced air, like an electric heater. The longer minimum
+        # run is the compressor, not heat left in the room.
+        "tau_minutes": 5.0,
+        "initial_fraction": 0.1,
+        "tau_charge_minutes": 5.0,
         "min_run_minutes": 15.0,
     },
     "electric": {
