@@ -56,6 +56,7 @@ export interface RoomLiveData {
   learning_paused_reason: "outdoor_unavailable" | null;
   compressor_protection_active: boolean;
   compressor_protection_reason: "min_off" | "min_run" | null;
+  compressor_protection_until: number | null;
   coil_dry_active: boolean;
   coil_dry_phase: "drain" | "blow" | null;
   coil_dry_until: number | null;
@@ -82,17 +83,17 @@ export interface DeviceConfig {
   idle_action?: "off" | "fan_only" | "setback" | "low"; // default "off"
   idle_fan_mode?: string; // default "low"
   setpoint_mode?: "proportional" | "direct" | "follow"; // default "proportional"
+  setpoint_offset?: number; // °C added to the room target in direct mode, default 0
   coil_dry?: "inherit" | "on" | "off"; // default "inherit"
   coil_dry_minutes?: number; // 0 = inherit global
   coil_dry_mode?: "" | "fan_only" | "dry"; // "" = inherit global
   coil_dry_fan_mode?: string; // "" = inherit global, "__keep__" = keep current
+  valve_opening_entity?: string; // number entity for direct valve opening degree (0-100%)
+  valve_closing_entity?: string; // number entity for direct valve closing degree (0-100%)
 }
 
 export type ConflictResolution =
-  | "heating_priority"
-  | "cooling_priority"
-  | "majority"
-  | "outdoor_temp";
+  "heating_priority" | "cooling_priority" | "majority" | "outdoor_temp";
 
 export interface CompressorGroup {
   id: string;
@@ -285,6 +286,7 @@ export interface AnalyticsData {
       Q_cool: number;
       Q_solar: number;
       Q_occupancy: number;
+      Q_fast?: number;
     };
     n_samples: number;
     n_observations: number;
@@ -296,6 +298,8 @@ export interface AnalyticsData {
     prediction_std_idle: number;
     prediction_std_heating: number;
     has_occupancy_sensors: boolean;
+    solar_gain_now?: number;
+    solar_gain_today_max?: number;
   };
 }
 

@@ -32,6 +32,12 @@ SETPOINT_MODE_PROPORTIONAL = "proportional"
 SETPOINT_MODE_DIRECT = "direct"
 SETPOINT_MODE_FOLLOW = "follow"
 
+# Per-device offset (°C) added to the room target in direct mode, for devices
+# whose internal sensor reads differently from the room sensor (#369).
+SETPOINT_OFFSET_MIN = -5.0
+SETPOINT_OFFSET_MAX = 5.0
+SETPOINT_OFFSET_STEP = 0.5
+
 # --- Coil dry (evaporator anti-odour run) ---
 # These live here, not in const.py, because get_coil_dry_config() resolves them
 # and this module is deliberately free of HA / RoomMind imports.  Same
@@ -272,7 +278,60 @@ def get_idle_action(devices: list[dict], entity_id: str) -> tuple[str, str]:
 
 def get_direct_setpoint_eids(devices: list[dict]) -> set[str]:
     """Return entity IDs of devices with setpoint_mode='direct'."""
-    return {d["entity_id"] for d in devices if d.get("entity_id") and d.get("setpoint_mode") == SETPOINT_MODE_DIRECT}
+    return {d["entity_id"] for d in devices if d.get("entity_id") and _is_direct(d)}
+
+
+def _is_direct(device: dict) -> bool:
+    """Direct setpoint mode; a TRV with direct valve control (#413) always gets the boost."""
+    return device.get("setpoint_mode") == SETPOINT_MODE_DIRECT and not (
+        device.get("type") == DEVICE_TYPE_TRV
+        and device.get("valve_opening_entity")
+        and device.get("valve_closing_entity")
+    )
+
+
+def get_setpoint_offset(devices: list[dict], entity_id: str) -> float:
+    """Return the direct-mode setpoint offset (°C) of a device, 0.0 if unset, invalid or not direct."""
+    dev = get_device_by_eid(devices, entity_id)
+    if dev is None or not _is_direct(dev):
+        return 0.0
+    try:
+        offset = float(dev.get("setpoint_offset") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    if offset != offset:  # NaN
+        return 0.0
+    return max(SETPOINT_OFFSET_MIN, min(SETPOINT_OFFSET_MAX, offset))
+
+
+def get_setpoint_offsets(devices: list[dict]) -> dict[str, float]:
+    """Return {entity_id: offset} for direct-mode devices with a non-zero offset."""
+    offsets = {d["entity_id"]: get_setpoint_offset(devices, d["entity_id"]) for d in devices if d.get("entity_id")}
+    return {eid: off for eid, off in offsets.items() if off}
+
+
+def get_valve_entities(devices: list[dict]) -> dict[str, tuple[str, str]]:
+    """Return {climate_entity_id: (opening_eid, closing_eid)} for TRVs with direct valve control (#413).
+
+    Both degrees are needed: opening X with closing 100 - X pins the valve at X %
+    whatever the TRV's own controller decides.
+    """
+    result: dict[str, tuple[str, str]] = {}
+    for d in devices:
+        eid = d.get("entity_id")
+        opening = d.get("valve_opening_entity") or None
+        closing = d.get("valve_closing_entity") or None
+        if eid and opening and closing and d.get("type") == DEVICE_TYPE_TRV:
+            result[eid] = (opening, closing)
+    return result
+
+
+def configured_valves(rooms: dict) -> dict[str, tuple[str, str]]:
+    """``get_valve_entities`` across all rooms."""
+    result: dict[str, tuple[str, str]] = {}
+    for room in rooms.values():
+        result.update(get_valve_entities(room.get("devices", [])))
+    return result
 
 
 def get_follow_setpoint_eids(devices: list[dict]) -> set[str]:

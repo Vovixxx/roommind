@@ -13,12 +13,15 @@ if TYPE_CHECKING:
 from homeassistant.util import dt as dt_util
 
 from ..const import (
+    CLIMATE_MODE_COOL_ONLY,
+    CLIMATE_MODE_HEAT_ONLY,
     DEFAULT_COMFORT_COOL,
     DEFAULT_COMFORT_HEAT,
     DEFAULT_ECO_COOL,
     DEFAULT_ECO_HEAT,
     MAX_TARGET_TEMP,
     MIN_TARGET_TEMP,
+    OVERRIDE_ECO,
     TargetTemps,
 )
 
@@ -115,6 +118,46 @@ def find_rejected_block_temps(
                     }
                 )
     return rejected
+
+
+def override_preset_band(room: dict, override_type: str) -> tuple[float, float]:
+    """Return the (heat, cool) band a boost/eco override stands for.
+
+    Both presets are bands in auto rooms, never a single point: collapsing eco
+    to ``eco_heat`` on both sides makes an AC cool toward the heating target (#284).
+    """
+    if override_type == OVERRIDE_ECO:
+        return (
+            room.get("eco_heat", room.get("eco_temp", DEFAULT_ECO_HEAT)),
+            room.get("eco_cool", DEFAULT_ECO_COOL),
+        )
+    return (
+        room.get("comfort_heat", room.get("comfort_temp", DEFAULT_COMFORT_HEAT)),
+        room.get("comfort_cool", DEFAULT_COMFORT_COOL),
+    )
+
+
+def mask_override_band(heat: float | None, cool: float | None, climate_mode: str) -> tuple[float | None, float | None]:
+    """Drop the side a heat_only/cool_only room cannot act on."""
+    if climate_mode == CLIMATE_MODE_HEAT_ONLY:
+        return heat, None
+    if climate_mode == CLIMATE_MODE_COOL_ONLY:
+        return None, cool
+    return heat, cool
+
+
+def cap_cool_only_heat(heat: float | None, cool: float | None, climate_mode: str) -> tuple[float | None, float | None]:
+    """Keep the unused heat side of a cool_only room from rising above the cool target.
+
+    A cool_only room configured with the legacy ``comfort_temp`` (API, old configs)
+    carried that value on the heat side next to the default ``comfort_cool``, e.g.
+    heat 24.5 / cool 24.0. The optimizer lifts the cool target to the heat side and
+    the cover target takes the higher one, while guard, hysteresis and the panel use
+    the cool target. The cool target is what the panel shows for cool_only rooms.
+    """
+    if climate_mode == CLIMATE_MODE_COOL_ONLY and heat is not None and cool is not None and heat > cool:
+        return cool, cool
+    return heat, cool
 
 
 def resolve_target_at_time(
@@ -285,6 +328,18 @@ def get_active_schedule_entity(
     return None
 
 
+def next_schedule_change(hass: HomeAssistant, room: dict) -> float | None:
+    """Return the timestamp of the active schedule's next block boundary, or None without one."""
+    entity_id = get_active_schedule_entity(hass, room)
+    state = hass.states.get(entity_id) if entity_id else None
+    raw = state.attributes.get("next_event") if state else None
+    if isinstance(raw, str):
+        raw = dt_util.parse_datetime(raw)
+    if not isinstance(raw, datetime):
+        return None
+    return raw.timestamp()
+
+
 async def read_schedule_blocks(
     hass: HomeAssistant,
     schedule_entity_id: str,
@@ -365,6 +420,7 @@ def make_target_resolver(
     presence_away_action = settings.get("presence_away_action", "eco")
     schedule_off_action = settings.get("schedule_off_action", "eco")
     presence_clears_override = bool(settings.get("presence_clears_override", False))
+    climate_mode = room.get("climate_mode", "auto")
 
     converter: Callable[[float], float] | None = None
     if hass is not None:
@@ -395,8 +451,11 @@ def make_target_resolver(
         if targets.heat is None and targets.cool is None:
             return targets
         return TargetTemps(
-            heat=targets.heat + mold_prevention_delta if targets.heat is not None else None,
-            cool=targets.cool if targets.cool is not None else None,
+            *cap_cool_only_heat(
+                targets.heat + mold_prevention_delta if targets.heat is not None else None,
+                targets.cool,
+                climate_mode,
+            )
         )
 
     return resolver

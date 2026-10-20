@@ -8,6 +8,7 @@ import time
 from typing import Any, cast
 
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 from ..const import (
     CLIMATE_MODE_COOL_ONLY,
@@ -16,6 +17,7 @@ from ..const import (
     DEFAULT_COMFORT_HEAT,
     DEFAULT_ECO_COOL,
     DEFAULT_ECO_HEAT,
+    MODE_IDLE,
 )
 from ..control.mpc_controller import (
     DEFAULT_OUTDOOR_TEMP_FALLBACK,
@@ -23,8 +25,20 @@ from ..control.mpc_controller import (
     get_can_heat_cool,
     is_mpc_active,
 )
+from ..control.solar import compute_q_solar_norm
 
 _LOGGER = logging.getLogger(__name__)
+
+SOLAR_PEAK_STEP_S = 600
+
+
+def clear_sky_peak_today(latitude: float, longitude: float, now: float) -> float:
+    """Highest clear-sky q_solar (GHI/1000) of the local calendar day containing *now*."""
+    start = dt_util.start_of_local_day(dt_util.utc_from_timestamp(now)).timestamp()
+    return max(
+        compute_q_solar_norm(latitude, longitude, start + i * SOLAR_PEAK_STEP_S)
+        for i in range(86400 // SOLAR_PEAK_STEP_S)
+    )
 
 
 def _safe_float(value: str) -> float | None:
@@ -89,6 +103,7 @@ async def _compute_target_forecast(
     """
     from ..utils.presence_utils import is_presence_away
     from ..utils.schedule_utils import (
+        cap_cool_only_heat,
         get_active_schedule_entity,
         read_schedule_blocks,
         resolve_targets_at_time,
@@ -146,6 +161,7 @@ async def _compute_target_forecast(
             heat_target = round(heat_target + mold_prevention_delta, 1)
         elif mold_prevention_delta > 0:
             heat_target = round(eco_heat + mold_prevention_delta, 1)
+        heat_target, cool_target = cap_cool_only_heat(heat_target, cool_target, climate_mode)
 
         # Chart display: mode-aware single value
         if climate_mode == CLIMATE_MODE_COOL_ONLY:
@@ -232,7 +248,7 @@ async def build_analytics_data(
                     if coordinator.outdoor_temp_effective is not None
                     else DEFAULT_OUTDOOR_TEMP_FALLBACK
                 )
-                mpc_active = is_mpc_active(mgr, area_id, can_heat, can_cool, 20.0, T_out)
+                mpc_active = is_mpc_active(mgr, area_id, can_heat, can_cool, 20.0, T_out, settings=settings)
             else:
                 mpc_active = False
             # EKF uncertainty: sqrt(P[0][0]) as proxy for sigma_e
@@ -251,6 +267,17 @@ async def build_analytics_data(
                 "prediction_std_idle": round(pred_std_idle, 4),
                 "prediction_std_heating": round(pred_std_heat, 4),
                 "has_occupancy_sensors": has_occupancy_sensors,
+                # Q_solar is the gain at full sun (1000 W/m²); these are what it means now and today
+                "solar_gain_now": round(
+                    rc.Q_solar
+                    * coordinator._current_q_solar
+                    * coordinator.rooms.get(area_id, {}).get("shading_factor", 1.0),
+                    3,
+                ),
+                "solar_gain_today_max": round(
+                    rc.Q_solar * clear_sky_peak_today(hass.config.latitude, hass.config.longitude, time.time()),
+                    3,
+                ),
             }
 
     # Build merged forecast: same format as history points, on a shared 5-min grid
@@ -339,6 +366,12 @@ async def build_analytics_data(
                         sim_q_occupancy = 1.0
                         break
 
+                # Seed the run in progress: without it the prediction starts idle, and a
+                # room inside the start hysteresis predicts a stop RoomMind never makes.
+                sim_prev_mode = coordinator._previous_modes.get(area_id, MODE_IDLE)
+                mode_on_since = coordinator._mode_on_since.get(area_id)
+                sim_mode_elapsed = (time.time() - mode_on_since) / 60.0 if mode_on_since is not None else None
+
                 pred_temps = cast(
                     list[float | None],
                     simulate_prediction(
@@ -359,6 +392,15 @@ async def build_analytics_data(
                         heating_duration_minutes=sim_heat_dur,
                         last_power_fraction=sim_last_pf,
                         q_occupancy=sim_q_occupancy,
+                        q_rebound=coordinator._rebound_tracker.get_charge(area_id),
+                        previous_mode=sim_prev_mode,
+                        mode_elapsed_minutes=sim_mode_elapsed,
+                        # AC heating alone in an orchestrated UFH room runs on AC rules
+                        run_system=("" if coordinator._heat_source_states.get(area_id) == "secondary" else system_type),
+                        outdoor_known=(
+                            coordinator.outdoor_temp_effective is not None
+                            or bool(coordinator._weather_manager._outdoor_forecast)
+                        ),
                     ),
                 )
 
