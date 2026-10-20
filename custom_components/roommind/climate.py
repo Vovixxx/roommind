@@ -53,6 +53,7 @@ from .deprecation import warn_deprecated_use
 from .entity import _get_area_name, room_device_info, room_device_name
 from .utils.device_utils import get_ac_eids, get_trv_eids
 from .utils.schedule_utils import mask_override_band, next_schedule_change, override_preset_band
+from .utils.temp_utils import celsius_delta_to_ha, celsius_to_ha_temp, ha_temp_to_celsius
 
 _CLIMATE_MODE_TO_HVAC = {
     CLIMATE_MODE_AUTO: HVACMode.HEAT_COOL,
@@ -70,12 +71,77 @@ _OVERRIDE_TO_PRESET: dict[str, str] = {
 _PRESET_TO_OVERRIDE: dict[str, str] = {PRESET_COMFORT: OVERRIDE_BOOST, PRESET_ECO: OVERRIDE_ECO}
 
 
+def _unit_is_fahrenheit(hass: HomeAssistant) -> bool:
+    """True only for a real Fahrenheit unit string.
+
+    A test double's temperature unit compares equal to anything, so the check
+    requires an actual string before converting.
+    """
+    unit = getattr(getattr(getattr(hass, "config", None), "units", None), "temperature_unit", None)
+    return isinstance(unit, str) and unit == UnitOfTemperature.FAHRENHEIT
+
+
+def _c_to_display(hass: HomeAssistant, value: float | None) -> float | None:
+    """Stored Celsius to the temperature Home Assistant is using."""
+    if not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if _unit_is_fahrenheit(hass):
+        return celsius_to_ha_temp(hass, number)
+    return number
+
+
+def _display_to_c(hass: HomeAssistant, value: float | None) -> float | None:
+    """A temperature from the climate entity back into stored Celsius."""
+    if not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if _unit_is_fahrenheit(hass):
+        return ha_temp_to_celsius(hass, number)
+    return number
+
+
+def _kwargs_to_celsius(hass: HomeAssistant, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Convert entity-unit targets in a set_temperature call to Celsius."""
+    converted = dict(kwargs)
+    for key in (ATTR_TEMPERATURE, ATTR_TARGET_TEMP_LOW, ATTR_TARGET_TEMP_HIGH):
+        if key in converted:
+            converted[key] = _display_to_c(hass, converted.get(key))
+    return converted
+
+
+class _HaUnitClimate:
+    """Climate temperatures follow the Home Assistant unit system."""
+
+    hass: HomeAssistant
+
+    @property
+    def temperature_unit(self) -> str:
+        if _unit_is_fahrenheit(self.hass):
+            return UnitOfTemperature.FAHRENHEIT
+        return UnitOfTemperature.CELSIUS
+
+    @property
+    def min_temp(self) -> float:
+        return float(_c_to_display(self.hass, MIN_TARGET_TEMP))
+
+    @property
+    def max_temp(self) -> float:
+        return float(_c_to_display(self.hass, MAX_TARGET_TEMP))
+
+    @property
+    def target_temperature_step(self) -> float:
+        if _unit_is_fahrenheit(self.hass):
+            return celsius_delta_to_ha(self.hass, 0.5)
+        return 0.5
+
+
 def _create_room_climates(
     coordinator: RoomMindCoordinator,
     area_id: str,
 ) -> list[ClimateEntity]:
-    """Create climate entities for a room."""
-    return [RoomMindOverrideClimate(coordinator, area_id), RoomMindRoomClimate(coordinator, area_id)]
+    """The zone has one climate. Holds live on that entity."""
+    return [RoomMindRoomClimate(coordinator, area_id)]
 
 
 async def async_setup_entry(
@@ -160,16 +226,12 @@ def _fill_auto_band(heat: float | None, cool: float | None, room: dict) -> tuple
     return heat, cool
 
 
-class RoomMindOverrideClimate(CoordinatorEntity, ClimateEntity):
-    """Climate entity for room override control."""
+class RoomMindOverrideClimate(_HaUnitClimate, CoordinatorEntity, ClimateEntity):
+    """Deprecated override climate. No longer created; kept so old tests and imports resolve."""
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:thermometer-alert"
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_target_temperature_step = 0.5
-    _attr_min_temp = MIN_TARGET_TEMP
-    _attr_max_temp = MAX_TARGET_TEMP
 
     def __init__(self, coordinator: RoomMindCoordinator, area_id: str) -> None:
         super().__init__(coordinator)
@@ -258,21 +320,21 @@ class RoomMindOverrideClimate(CoordinatorEntity, ClimateEntity):
             val = room.get("override_cool")
         else:
             val = room.get("override_heat")
-        return float(val) if isinstance(val, (int, float)) else None
+        return _c_to_display(self.hass, val if isinstance(val, (int, float)) else None)
 
     @property
     def target_temperature_low(self) -> float | None:
         if not self._is_override_active():
             return None
         val = (self._room() or {}).get("override_heat")
-        return float(val) if isinstance(val, (int, float)) else None
+        return _c_to_display(self.hass, val if isinstance(val, (int, float)) else None)
 
     @property
     def target_temperature_high(self) -> float | None:
         if not self._is_override_active():
             return None
         val = (self._room() or {}).get("override_cool")
-        return float(val) if isinstance(val, (int, float)) else None
+        return _c_to_display(self.hass, val if isinstance(val, (int, float)) else None)
 
     @property
     def current_temperature(self) -> float | None:
@@ -284,12 +346,13 @@ class RoomMindOverrideClimate(CoordinatorEntity, ClimateEntity):
         if not room_data:
             return None
         val = room_data.get("current_temp")
-        return float(val) if isinstance(val, (int, float)) else None
+        return _c_to_display(self.hass, val if isinstance(val, (int, float)) else None)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set override targets from range or single temperature."""
         warn_deprecated_use(self.entity_id, self._area_id)
         store = self.coordinator.hass.data[DOMAIN]["store"]
+        kwargs = _kwargs_to_celsius(self.hass, kwargs)
         band = _band_from_temperature_call(kwargs, self._climate_mode(), self._current_band, self._room() or {})
         if band is None:
             return
@@ -350,7 +413,7 @@ class RoomMindOverrideClimate(CoordinatorEntity, ClimateEntity):
         await self._request_refresh()
 
 
-class RoomMindRoomClimate(CoordinatorEntity, ClimateEntity):
+class RoomMindRoomClimate(_HaUnitClimate, CoordinatorEntity, ClimateEntity):
     """The room as one thermostat: mode, presets, target band and what RoomMind is doing (#238).
 
     Changing the target or picking a preset sets an override that holds until the
@@ -359,10 +422,6 @@ class RoomMindRoomClimate(CoordinatorEntity, ClimateEntity):
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:home-thermometer"
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_target_temperature_step = 0.5
-    _attr_min_temp = MIN_TARGET_TEMP
-    _attr_max_temp = MAX_TARGET_TEMP
     _attr_translation_key = "room"
     _attr_preset_modes = [PRESET_NONE, PRESET_COMFORT, PRESET_ECO, PRESET_MANUAL]
 
@@ -482,7 +541,7 @@ class RoomMindRoomClimate(CoordinatorEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         val = self._live().get("current_temp")
-        return float(val) if isinstance(val, (int, float)) else None
+        return _c_to_display(self.hass, val if isinstance(val, (int, float)) else None)
 
     @property
     def current_humidity(self) -> float | None:
@@ -512,17 +571,17 @@ class RoomMindRoomClimate(CoordinatorEntity, ClimateEntity):
             return None
         heat, cool = self._band()
         val = cool if mode == CLIMATE_MODE_COOL_ONLY else heat
-        return float(val) if isinstance(val, (int, float)) else None
+        return _c_to_display(self.hass, val if isinstance(val, (int, float)) else None)
 
     @property
     def target_temperature_low(self) -> float | None:
         heat, _ = self._band()
-        return float(heat) if isinstance(heat, (int, float)) else None
+        return _c_to_display(self.hass, heat if isinstance(heat, (int, float)) else None)
 
     @property
     def target_temperature_high(self) -> float | None:
         _, cool = self._band()
-        return float(cool) if isinstance(cool, (int, float)) else None
+        return _c_to_display(self.hass, cool if isinstance(cool, (int, float)) else None)
 
     @property
     def preset_mode(self) -> str | None:
@@ -573,12 +632,12 @@ class RoomMindRoomClimate(CoordinatorEntity, ClimateEntity):
             (kwargs.get(ATTR_TEMPERATURE), single_side),
         ]
         given = [(want, have) for want, have in pairs if want is not None]
-        tolerance = self._attr_target_temperature_step / 2
-        return bool(given) and all(have is not None and abs(want - have) < tolerance for want, have in given)
+        return bool(given) and all(have is not None and abs(want - have) < 0.25 for want, have in given)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Hold the given target until the schedule changes next."""
         hvac_mode = kwargs.pop(ATTR_HVAC_MODE, None)
+        kwargs = _kwargs_to_celsius(self.hass, kwargs)
         if hvac_mode is not None:
             # HA passes it through unchecked here, unlike the set_hvac_mode service
             if hvac_mode not in self.hvac_modes:

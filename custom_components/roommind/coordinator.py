@@ -790,6 +790,13 @@ class RoomMindCoordinator(DataUpdateCoordinator):
 
         # --- Compute residual heat from previous cycle state ---
         system_type = room.get("heating_system_type", "")
+        if self._heat_source_states.get(area_id) == "secondary":
+            # The floor's long residual must not linger on a heat-pump-only run.
+            system_type = ""
+            for device in room.get("devices", []):
+                if device.get("type") == "ac" and device.get("heating_system_type") == "heat_pump":
+                    system_type = "heat_pump"
+                    break
         q_residual = self._residual_tracker.get_q_residual(
             area_id,
             system_type,
@@ -835,6 +842,8 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             q_rebound=q_rebound,
             previous_heat_sources=self._heat_source_states.get(area_id, "none"),
             head_offsets=self._head_offsets,
+            heat_source_now=time.monotonic(),
+            heat_source_primary_on_since=self._heat_source_primary_on_since.get(area_id),
         )
         mode, power_fraction = await controller.async_evaluate(current_temp, targets)
 

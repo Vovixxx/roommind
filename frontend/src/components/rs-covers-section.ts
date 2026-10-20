@@ -6,6 +6,13 @@ import { getEntitiesForArea } from "../utils/room-state";
 import { getSelectValue } from "../utils/events";
 import { masterDetailStyles } from "../styles/master-detail-styles";
 import { inputStyles } from "../styles/input-styles";
+import {
+  tempUnit,
+  toCelsius,
+  toCelsiusDelta,
+  toDisplay,
+  toDisplayDelta,
+} from "../utils/temperature";
 import "./shared/rs-toggle-row";
 import "./shared/rs-threshold-field";
 import "./shared/rs-master-detail";
@@ -715,13 +722,16 @@ export class RsCoverSection extends LitElement {
                                   <rs-threshold-field
                                     .label=${localize("covers.deploy_threshold", l)}
                                     .hint=${localize("covers.deploy_threshold_hint", l)}
-                                    .value=${this.deployThreshold}
-                                    .min=${0.5}
-                                    .max=${5.0}
+                                    .value=${Number(toDisplayDelta(this.deployThreshold, this.hass).toFixed(1))}
+                                    .min=${Number(toDisplayDelta(0.5, this.hass).toFixed(1))}
+                                    .max=${Number(toDisplayDelta(5.0, this.hass).toFixed(1))}
                                     .step=${0.5}
-                                    suffix="°C"
+                                    .suffix=${tempUnit(this.hass)}
                                     @value-changed=${(e: CustomEvent) =>
-                                      this._emit("covers_deploy_threshold", e.detail)}
+                                      this._emit(
+                                        "covers_deploy_threshold",
+                                        toCelsiusDelta(Number(e.detail), this.hass),
+                                      )}
                                   ></rs-threshold-field>
                                   <rs-threshold-field
                                     .label=${localize("covers.min_position", l)}
@@ -750,13 +760,18 @@ export class RsCoverSection extends LitElement {
                                   <rs-threshold-field
                                     .label=${localize("covers.outdoor_min_temp", l)}
                                     .hint=${localize("covers.outdoor_min_temp_hint", l)}
-                                    .value=${this.outdoorMinTemp ?? 10}
-                                    .min=${0}
-                                    .max=${35}
+                                    .value=${Number(
+                                      toDisplay(this.outdoorMinTemp ?? 10, this.hass).toFixed(1),
+                                    )}
+                                    .min=${Number(toDisplay(0, this.hass).toFixed(0))}
+                                    .max=${Number(toDisplay(35, this.hass).toFixed(0))}
                                     .step=${1}
-                                    suffix="°C"
+                                    .suffix=${tempUnit(this.hass)}
                                     @value-changed=${(e: CustomEvent) =>
-                                      this._emit("covers_outdoor_min_temp", e.detail)}
+                                      this._emit(
+                                        "covers_outdoor_min_temp",
+                                        toCelsius(Number(e.detail), this.hass),
+                                      )}
                                   ></rs-threshold-field>
                                 </div>
                                 <div class="group-divider"></div>

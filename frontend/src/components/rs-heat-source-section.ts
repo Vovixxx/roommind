@@ -4,10 +4,26 @@ import type { HomeAssistant } from "../types";
 import { localize, type TranslationKey } from "../utils/localize";
 import { getSelectValue } from "../utils/events";
 import { inputStyles } from "../styles/input-styles";
+import {
+  tempUnit,
+  toCelsius,
+  toCelsiusDelta,
+  toDisplay,
+  toDisplayDelta,
+} from "../utils/temperature";
 
 import "./shared/rs-info-icon";
 
 type HeatSourcePolicy = "efficiency" | "hydronic_first" | "air_first";
+type TempKind = "absolute" | "delta" | "plain";
+
+const ABSOLUTE_KEYS = new Set(["heat_source_outdoor_threshold", "heat_source_ac_min_outdoor"]);
+const DELTA_KEYS = new Set([
+  "heat_source_primary_delta",
+  "heat_source_hysteresis",
+  "heat_source_join_delta",
+  "heat_source_drop_hysteresis",
+]);
 
 const POLICY_LABEL_KEYS: Record<HeatSourcePolicy, TranslationKey> = {
   efficiency: "heat_source.policy_efficiency",
@@ -160,20 +176,13 @@ export class RsHeatSourceSection extends LitElement {
       if (policy === "efficiency") {
         return html`<div class="summary">
           ${localize("heat_source.primary_delta", lang)}:
-          <strong>${this.primaryDelta}${localize("heat_source.primary_delta_suffix", lang)}</strong>
+          <strong>${this._format(this.primaryDelta, "delta")}</strong>
           · ${localize("heat_source.outdoor_threshold", lang)}:
-          <strong
-            >${this.outdoorThreshold}${localize(
-              "heat_source.outdoor_threshold_suffix",
-              lang,
-            )}</strong
-          >
+          <strong>${this._format(this.outdoorThreshold, "absolute")}</strong>
           · ${localize("heat_source.ac_min_outdoor", lang)}:
-          <strong
-            >${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong
-          >
+          <strong>${this._format(this.acMinOutdoor, "absolute")}</strong>
           · ${localize("heat_source.hysteresis", lang)}:
-          <strong>${this.hysteresis}${localize("heat_source.primary_delta_suffix", lang)}</strong>
+          <strong>${this._format(this.hysteresis, "delta")}</strong>
           · ${localize("heat_source.large_gap_multiplier", lang)}:
           <strong>${this.largeGapMultiplier}×</strong>
           · ${localize("heat_source.secondary_power_scale", lang)}:
@@ -182,15 +191,13 @@ export class RsHeatSourceSection extends LitElement {
       }
       return html`<div class="summary">
         ${localize(POLICY_LABEL_KEYS[policy], lang)} · ${localize("heat_source.join_delta", lang)}:
-        <strong>${this.joinDelta}${localize("heat_source.join_delta_suffix", lang)}</strong> ·
+        <strong>${this._format(this.joinDelta, "delta")}</strong> ·
         ${localize("heat_source.join_hold", lang)}:
         <strong>${this.joinHoldMinutes}${localize("heat_source.join_hold_suffix", lang)}</strong> ·
         ${localize("heat_source.drop_hysteresis", lang)}:
-        <strong
-          >${this.dropHysteresis}${localize("heat_source.drop_hysteresis_suffix", lang)}</strong
-        >
+        <strong>${this._format(this.dropHysteresis, "delta")}</strong>
         · ${localize("heat_source.ac_min_outdoor", lang)}:
-        <strong>${this.acMinOutdoor}${localize("heat_source.ac_min_outdoor_suffix", lang)}</strong>
+        <strong>${this._format(this.acMinOutdoor, "absolute")}</strong>
         · ${localize("heat_source.secondary_power_scale", lang)}:
         <strong>${this.secondaryPowerScale}</strong>
       </div>`;
@@ -381,11 +388,11 @@ export class RsHeatSourceSection extends LitElement {
           <rs-info-icon .text=${opts.hint}></rs-info-icon>
         </div>
         <ha-textfield
-          .value=${String(opts.value)}
-          .min=${String(opts.min)}
-          .max=${String(opts.max)}
+          .value=${String(this._show(opts.value, this._kind(opts.key)))}
+          .min=${String(this._show(opts.min, this._kind(opts.key)))}
+          .max=${String(this._show(opts.max, this._kind(opts.key)))}
           .step=${String(opts.step)}
-          .suffix=${opts.suffix}
+          .suffix=${this._kind(opts.key) === "plain" ? opts.suffix : tempUnit(this.hass)}
           type="number"
           @input=${(e: Event) => this._onNumberInput(opts.key, e)}
         ></ha-textfield>
@@ -404,10 +411,32 @@ export class RsHeatSourceSection extends LitElement {
     }
   }
 
+  private _kind(key: string): TempKind {
+    if (ABSOLUTE_KEYS.has(key)) return "absolute";
+    if (DELTA_KEYS.has(key)) return "delta";
+    return "plain";
+  }
+
+  private _show(value: number, kind: TempKind): number {
+    if (kind === "absolute") return Number(toDisplay(value, this.hass).toFixed(1));
+    if (kind === "delta") return Number(toDisplayDelta(value, this.hass).toFixed(1));
+    return value;
+  }
+
+  private _store(value: number, kind: TempKind): number {
+    if (kind === "absolute") return toCelsius(value, this.hass);
+    if (kind === "delta") return toCelsiusDelta(value, this.hass);
+    return value;
+  }
+
+  private _format(value: number, kind: TempKind): string {
+    return `${this._show(value, kind)}${tempUnit(this.hass)}`;
+  }
+
   private _onNumberInput(key: string, e: Event) {
     const val = parseFloat((e.target as HTMLInputElement).value);
     if (!isNaN(val)) {
-      this._emit(key, val);
+      this._emit(key, this._store(val, this._kind(key)));
     }
   }
 

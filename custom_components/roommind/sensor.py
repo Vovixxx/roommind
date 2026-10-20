@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import RoomMindCoordinator
 from .entity import room_device_info, room_device_name
+from .utils.temp_utils import celsius_to_ha_temp
 
 
 def _create_room_entities(coordinator: RoomMindCoordinator, area_id: str) -> list[SensorEntity]:
@@ -84,11 +85,27 @@ class _RoomMindBaseSensor(CoordinatorEntity, SensorEntity):
 class RoomMindTargetTemperatureSensor(_RoomMindBaseSensor):
     """Sensor showing the target temperature for a RoomMind room."""
 
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _data_key = "target_temp"
 
     def __init__(self, coordinator: RoomMindCoordinator, area_id: str) -> None:
         super().__init__(coordinator, area_id, "target_temp", "Target Temperature")
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        unit = getattr(getattr(getattr(self.hass, "config", None), "units", None), "temperature_unit", None)
+        if isinstance(unit, str):
+            return unit
+        return UnitOfTemperature.CELSIUS
+
+    @property
+    def native_value(self) -> float | None:
+        room = self.coordinator.data.get("rooms", {}).get(self._area_id) if self.coordinator.data else None
+        val = room.get(self._data_key) if room else None
+        if not isinstance(val, (int, float)):
+            return None
+        if self.native_unit_of_measurement == UnitOfTemperature.FAHRENHEIT:
+            return celsius_to_ha_temp(self.hass, float(val))
+        return float(val)
 
 
 class RoomMindModeSensor(_RoomMindBaseSensor):

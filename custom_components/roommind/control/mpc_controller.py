@@ -1345,6 +1345,8 @@ class MPCController:
         q_rebound: float | None = None,
         previous_heat_sources: str = "none",
         head_offsets: HeadOffsetTracker | None = None,
+        heat_source_now: float | None = None,
+        heat_source_primary_on_since: float | None = None,
     ) -> None:
         self.hass = hass
         self.room_config = room_config
@@ -1377,6 +1379,8 @@ class MPCController:
         # Heating system whose run rules apply this cycle (see _resolve_run_system)
         self._run_system = heating_system_type
         self._previous_heat_sources = previous_heat_sources
+        self._heat_source_now = heat_source_now
+        self._heat_source_primary_on_since = heat_source_primary_on_since
         self._mode_on_since = mode_on_since
         self._idle_since = idle_since
         self._shading_factor = shading_factor
@@ -1524,6 +1528,8 @@ class MPCController:
                 outdoor_temp=self.outdoor_temp,
                 previous_active_sources=self._previous_heat_sources,
                 hass=self.hass,
+                now_monotonic=self._heat_source_now,
+                primary_on_since=self._heat_source_primary_on_since,
             )
             sources = (
                 plan.active_sources
