@@ -382,13 +382,9 @@ export class RsHeroStatus extends LitElement {
     const devices = this.config?.devices ?? [];
     const plant = devices.filter(
       (device) =>
-        (device.type === "trv" || device.type === "switch") &&
-        device.role !== "secondary" &&
-        device.role !== "cool_only",
+        (device.type === "trv" || device.type === "switch") && device.role !== "cool_only",
     );
-    const backup = devices.filter(
-      (device) => device.type === "ac" && device.role !== "primary" && device.role !== "cool_only",
-    );
+    const backup = devices.filter((device) => device.type === "ac" && device.role !== "cool_only");
     const chosen =
       active === "both" ? [...plant, ...backup] : active === "secondary" ? backup : plant;
     const names = [...new Set(chosen.map((device) => this._deviceHeatName(device)))];

@@ -53,14 +53,14 @@ def test_device_role_auto_constant():
 
 
 def test_heat_source_groups_roles():
+    """A saved primary or backup role does not move a device between plant and backup."""
     devices = [
-        {"entity_id": "climate.floor", "type": "trv", "role": "primary"},
-        {"entity_id": "climate.split", "type": "ac", "role": "secondary"},
+        {"entity_id": "climate.floor", "type": "trv", "role": "secondary"},
+        {"entity_id": "climate.split", "type": "ac", "role": "primary"},
         {"entity_id": "climate.cool", "type": "ac", "role": "cool_only"},
-        {"entity_id": "climate.swapped", "type": "ac", "role": "primary"},
     ]
     primary, secondary = heat_source_groups(devices)
-    assert primary == [("climate.floor", "thermostat"), ("climate.swapped", "ac")]
+    assert primary == [("climate.floor", "thermostat")]
     assert secondary == [("climate.split", "ac")]
 
 

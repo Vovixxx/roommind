@@ -464,9 +464,9 @@ export class RsDeviceSection extends LitElement {
           : nothing
       }
       ${
-        device && device.role && device.role !== "auto"
+        device?.role === "cool_only"
           ? html`<span class="valve-exclude-badge"
-              >${localize(`devices.heat_role_${device.role}`, this.hass.language)}</span
+              >${localize("devices.heat_role_cool_only", this.hass.language)}</span
             >`
           : nothing
       }
@@ -484,7 +484,7 @@ export class RsDeviceSection extends LitElement {
       showDirectBadge ||
       showValveBadge ||
       showExcludeBadge ||
-      (device != null && !!device.role && device.role !== "auto") ||
+      device?.role === "cool_only" ||
       !!device?.heating_system_type;
 
     return html`

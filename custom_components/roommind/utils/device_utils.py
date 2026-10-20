@@ -264,39 +264,28 @@ def get_switch_eids(devices: list[dict]) -> list[str]:
 
 
 def heat_source_groups(devices: list[dict]) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
-    """Split devices into primary and secondary heaters.
+    """Split devices into the plant and the backup.
 
-    A saved primary, secondary, or cool-only role still wins. Otherwise a
-    thermostat or heat switch is the plant and a climate that can heat is
-    the backup. Cool-only climates are left out of heating.
+    The orchestrator decides when each runs. A thermostat or heat switch is
+    the plant. A climate that can heat is the backup. Cool-only climates are
+    left out of heating. A stored primary or backup role does not reorder them.
     """
-    primary: list[tuple[str, str]] = []
-    secondary: list[tuple[str, str]] = []
-    auto: list[tuple[str, str, int]] = []
+    ranked: list[tuple[str, str, int]] = []
     for device in devices:
         entity_id = device.get("entity_id")
         if not entity_id:
             continue
         dtype = device.get("type")
         role = device.get("role") or DEVICE_ROLE_AUTO
-        if role not in VALID_DEVICE_ROLES:
-            role = DEVICE_ROLE_AUTO
         if role == DEVICE_ROLE_COOL_ONLY or dtype not in VALID_DEVICE_TYPES:
             continue
         kind = "ac" if dtype == DEVICE_TYPE_AC else "thermostat"
-        if role == DEVICE_ROLE_PRIMARY:
-            primary.append((entity_id, kind))
-        elif role == DEVICE_ROLE_SECONDARY:
-            secondary.append((entity_id, kind))
-        else:
-            auto.append((entity_id, kind, 1 if dtype == DEVICE_TYPE_AC else 2))
-    if auto:
-        top = max(rank for _, _, rank in auto)
-        for entity_id, kind, rank in auto:
-            if rank == top:
-                primary.append((entity_id, kind))
-            else:
-                secondary.append((entity_id, kind))
+        ranked.append((entity_id, kind, 1 if dtype == DEVICE_TYPE_AC else 2))
+    if not ranked:
+        return [], []
+    top = max(rank for _, _, rank in ranked)
+    primary = [(entity_id, kind) for entity_id, kind, rank in ranked if rank == top]
+    secondary = [(entity_id, kind) for entity_id, kind, rank in ranked if rank < top]
     return primary, secondary
 
 

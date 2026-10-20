@@ -581,7 +581,8 @@ class TestEvaluateHeatSources:
         ac_cmds = [c for c in result.commands if c.device_type == "ac"]
         assert ac_cmds[0].power_fraction == 0.32
 
-    def test_role_swap_makes_the_floor_the_backup(self):
+    def test_saved_role_does_not_make_the_heat_pump_the_plant(self):
+        """Cold weather still runs the floor. A stored primary role on the AC does not swap them."""
         hass = _make_hass(["heat", "cool"])
         room = _make_room()
         room["devices"] = [
@@ -594,9 +595,9 @@ class TestEvaluateHeatSources:
         assert result.active_sources == "primary"
         ac_cmds = [c for c in result.commands if c.entity_id == "climate.ac_1"]
         trv_cmds = [c for c in result.commands if c.entity_id == "climate.trv_1"]
-        assert ac_cmds[0].active
-        assert ac_cmds[0].role == "primary"
-        assert not trv_cmds[0].active
+        assert trv_cmds[0].active
+        assert trv_cmds[0].role == "primary"
+        assert not ac_cmds[0].active
 
     def test_cool_only_device_is_left_out_of_heating(self):
         hass = _make_hass(["heat", "cool"])
