@@ -98,6 +98,7 @@ def evaluate_heat_sources(
     *,
     now_monotonic: float | None = None,
     primary_on_since: float | None = None,
+    plant_cannot_hold: bool = False,
 ) -> HeatSourcePlan | None:
     """Evaluate which heating devices to activate.
 
@@ -223,6 +224,9 @@ def evaluate_heat_sources(
                 already_both = previous_active_sources == "both"
                 if already_both:
                     stage2_on = delta_t > join_delta - drop_h
+                elif plant_cannot_hold and delta_t > 0:
+                    # The plant's coast would leave the comfort band.
+                    stage2_on = True
                 elif hold_elapsed and delta_t >= join_delta:
                     stage2_on = True
                 else:

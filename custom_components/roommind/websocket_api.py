@@ -200,6 +200,7 @@ _SETTINGS_SAVE_FIELDS = (
     "room_order",
     "group_by_floor",
     "compressor_groups",
+    "boiler_groups",
 )
 
 
@@ -364,6 +365,7 @@ async def websocket_list_rooms(
             ),
             "coil_dry_drain_minutes": settings.get("coil_dry_drain_minutes", DEFAULT_COIL_DRY_DRAIN_MINUTES),
             "compressor_groups": settings.get("compressor_groups", []),
+            "boiler_groups": settings.get("boiler_groups", []),
         },
     )
 
@@ -754,6 +756,15 @@ async def websocket_get_settings(
         ],
         vol.Optional("room_order"): [str],
         vol.Optional("group_by_floor"): bool,
+        vol.Optional("boiler_groups"): [
+            {
+                vol.Required("id"): str,
+                vol.Required("name"): str,
+                vol.Required("members"): vol.All([str], vol.Length(min=1)),
+                vol.Optional("min_run_minutes", default=10): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+                vol.Optional("min_off_minutes", default=5): vol.All(vol.Coerce(int), vol.Range(min=1, max=30)),
+            }
+        ],
         vol.Optional("compressor_groups"): [
             {
                 vol.Required("id"): str,
@@ -857,6 +868,27 @@ async def websocket_save_settings(
                 "duplicate_master",
                 "A master entity cannot be assigned to multiple groups",
             )
+            return
+
+    boiler_groups = changes.get("boiler_groups")
+    if boiler_groups:
+        boiler_ids = [g.get("id", "") for g in boiler_groups]
+        if len(boiler_ids) != len(set(boiler_ids)):
+            connection.send_error(msg["id"], "duplicate_group_id", "Boiler group IDs must be unique")
+            return
+        boiler_members: list[str] = []
+        for group in boiler_groups:
+            for eid in group.get("members", []):
+                if not eid.startswith("switch."):
+                    connection.send_error(
+                        msg["id"],
+                        "invalid_member",
+                        f"Boiler group member '{eid}' is not a switch",
+                    )
+                    return
+            boiler_members.extend(group.get("members", []))
+        if len(boiler_members) != len(set(boiler_members)):
+            connection.send_error(msg["id"], "duplicate_member", "A switch cannot be in multiple boiler groups")
             return
 
     settings = await store.async_save_settings(changes)

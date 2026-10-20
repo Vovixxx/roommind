@@ -11,6 +11,7 @@ import type {
   RoomConfig,
   NotificationTarget,
   CompressorGroup,
+  BoilerGroup,
 } from "../types";
 import { localize } from "../utils/localize";
 import { fireSaveStatus } from "../utils/events";
@@ -23,6 +24,7 @@ import "./settings/rs-settings-presence";
 import "./settings/rs-settings-vacation";
 import "./settings/rs-settings-valve";
 import "./settings/rs-settings-compressor";
+import "./settings/rs-settings-boiler";
 import "./settings/rs-settings-coil-dry";
 import "./settings/rs-settings-mold";
 import "./settings/rs-settings-notifications";
@@ -66,6 +68,7 @@ export class RsSettings extends LitElement {
   @state() private _moldPreventionIntensity: "light" | "medium" | "strong" = "medium";
   @state() private _moldPreventionNotify = false;
   @state() private _compressorGroups: CompressorGroup[] = [];
+  @state() private _boilerGroups: BoilerGroup[] = [];
   @state() private _coilDryEnabled = false;
   @state() private _coilDryMinutes = 20;
   @state() private _coilDryMode: "fan_only" | "dry" = "fan_only";
@@ -130,6 +133,7 @@ export class RsSettings extends LitElement {
       this._moldPreventionIntensity = s.mold_prevention_intensity ?? "medium";
       this._moldPreventionNotify = s.mold_prevention_notify_enabled ?? false;
       this._compressorGroups = s.compressor_groups ?? [];
+      this._boilerGroups = s.boiler_groups ?? [];
       this._coilDryEnabled = s.coil_dry_enabled ?? false;
       this._coilDryMinutes = s.coil_dry_minutes ?? 20;
       this._coilDryMode = s.coil_dry_mode ?? "fan_only";
@@ -250,6 +254,18 @@ export class RsSettings extends LitElement {
           .compressorGroups=${this._compressorGroups}
           @setting-changed=${this._onSettingChanged}
         ></rs-settings-compressor>
+      </rs-settings-panel>
+
+      <rs-settings-panel
+        icon="mdi:water-boiler"
+        .heading=${localize("boiler.title", l)}
+        .intro=${localize("boiler.intro", l)}
+      >
+        <rs-settings-boiler
+          .hass=${this.hass}
+          .boilerGroups=${this._boilerGroups}
+          @setting-changed=${this._onSettingChanged}
+        ></rs-settings-boiler>
       </rs-settings-panel>
 
       <rs-settings-panel .heading=${localize("coil_dry.title", l)} icon="mdi:air-filter">
@@ -401,6 +417,7 @@ export class RsSettings extends LitElement {
         valve_protection_enabled: this._valveProtectionEnabled,
         valve_protection_interval_days: this._valveProtectionInterval,
         compressor_groups: this._compressorGroups.filter((g) => g.members.length > 0),
+        boiler_groups: this._boilerGroups.filter((g) => g.members.length > 0),
         coil_dry_enabled: this._coilDryEnabled,
         coil_dry_minutes: this._coilDryMinutes,
         coil_dry_mode: this._coilDryMode,

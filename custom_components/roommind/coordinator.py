@@ -64,6 +64,7 @@ from .control.mpc_controller import (
 )
 from .control.residual_heat import mean_rebound
 from .control.solar import compute_q_solar_norm
+from .control.source_behavior import SourceBehavior
 from .control.thermal_model import RoomModelManager
 from .managers.ac_coil_dry_manager import AcCoilDryManager, CoilDryRoomResult
 from .managers.compressor_group_manager import (
@@ -202,6 +203,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         self._rebound_tracker = AcReboundTracker()
         # Offset of each AC's own sensor from the room sensor while it runs (setpoints in the device's frame)
         self._head_offsets = HeadOffsetTracker()
+        self._source_behavior = SourceBehavior()
         # EKF training accumulation
         self._ekf_training = EkfTrainingManager(self._model_manager)
         # Cover/blind automatic control
@@ -299,6 +301,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             self._valve_manager.load_actuation_data(settings.get("valve_last_actuation", {}))
             self._coil_dry_manager.load_state(settings.get("coil_dry_state", {}))
             self._head_offsets.load_state(settings.get("ac_head_offsets", {}))
+            self._source_behavior = SourceBehavior(settings.get("source_behaviors"))
             self._model_loaded = True
 
         # Initialize history store (once)
@@ -457,6 +460,9 @@ class RoomMindCoordinator(DataUpdateCoordinator):
         if self._head_offsets.dirty and self._thermal_save_count == 0:
             await store.async_save_settings({"ac_head_offsets": self._head_offsets.get_state()})
             self._head_offsets.dirty = False
+        if self._source_behavior.dirty and self._thermal_save_count == 0:
+            await store.async_save_settings({"source_behaviors": self._source_behavior.export()})
+            self._source_behavior.dirty = False
 
         # Coil dry: drop state for devices no longer configured anywhere
         self._coil_dry_manager.prune(set(build_rooms_devices_map(rooms)))
@@ -798,10 +804,18 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 if device.get("type") == "ac" and device.get("heating_system_type") == "heat_pump":
                     system_type = "heat_pump"
                     break
+        learned_tau = None
+        if system_type:
+            from .const import HEATING_SYSTEM_PROFILES
+
+            default_tau = (HEATING_SYSTEM_PROFILES.get(system_type) or {}).get("tau_minutes")
+            if default_tau:
+                learned_tau = self._source_behavior.tau(system_type, float(default_tau))
         q_residual = self._residual_tracker.get_q_residual(
             area_id,
             system_type,
             self._previous_modes.get(area_id, MODE_IDLE),
+            learned_tau,
         )
         q_rebound = self._rebound_tracker.get_charge(area_id)
 
@@ -847,6 +861,14 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             heat_source_primary_on_since=self._heat_source_primary_on_since.get(area_id),
         )
         mode, power_fraction = await controller.async_evaluate(current_temp, targets)
+        self._source_behavior.observe(
+            area_id,
+            controller._run_system if mode == MODE_HEATING else "",
+            mode,
+            current_temp,
+            time.time(),
+            power_fraction,
+        )
 
         # Compute effective single target_temp for display/history (mode + climate_mode aware)
         climate_mode = room.get("climate_mode", "auto")
@@ -957,6 +979,21 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             and get_ac_eids(room.get("devices", []))
         ):
             now = time.monotonic()
+            plant_cannot_hold = False
+            if (
+                room.get("heat_source_policy") == "hydronic_first"
+                and current_temp is not None
+                and targets.heat is not None
+                and self.outdoor_temp_effective is not None
+            ):
+                coast = self._model_manager.get_model(area_id).predict(
+                    current_temp,
+                    self.outdoor_temp_effective,
+                    0.0,
+                    30.0,
+                    q_residual=q_residual,
+                )
+                plant_cannot_hold = coast < targets.heat - 0.3
             heat_source_plan = evaluate_heat_sources(
                 room_config=room,
                 mode=mode,
@@ -968,6 +1005,7 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 hass=self.hass,
                 now_monotonic=now,
                 primary_on_since=self._heat_source_primary_on_since.get(area_id),
+                plant_cannot_hold=plant_cannot_hold,
             )
             if heat_source_plan is not None:
                 self._heat_source_states[area_id] = heat_source_plan.active_sources

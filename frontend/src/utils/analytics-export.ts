@@ -3,8 +3,9 @@
  */
 import type { AnalyticsData } from "../types";
 import type { RoomConfig, HomeAssistant } from "../types";
+import { toDisplay } from "./temperature";
 
-export function buildCsvString(data: AnalyticsData): string | null {
+export function buildCsvString(data: AnalyticsData, hass?: HomeAssistant): string | null {
   const points = [...data.history, ...data.detail];
   if (points.length === 0) return null;
 
@@ -12,15 +13,17 @@ export function buildCsvString(data: AnalyticsData): string | null {
     "timestamp,datetime,room_temp,outdoor_temp,target_temp,mode,predicted_temp,window_open,heating_power,solar_irradiance,blind_position,cover_reason,device_setpoint";
   const rows = points.map((p) => {
     const dt = new Date(p.ts * 1000).toISOString();
-    const rt = p.room_temp ?? "";
-    const ot = p.outdoor_temp ?? "";
-    const tt = p.target_temp ?? "";
-    const pt = p.predicted_temp ?? "";
+    const show = (value: number | null | undefined) =>
+      value == null ? "" : hass ? toDisplay(value, hass).toFixed(1) : value;
+    const rt = show(p.room_temp);
+    const ot = show(p.outdoor_temp);
+    const tt = show(p.target_temp);
+    const pt = show(p.predicted_temp);
     const hp = p.heating_power ?? "";
     const si = p.solar_irradiance ?? "";
     const bp = p.blind_position ?? "";
     const cr = p.cover_reason ?? "";
-    const ds = p.device_setpoint ?? "";
+    const ds = show(p.device_setpoint);
     return `${p.ts},${dt},${rt},${ot},${tt},${p.mode},${pt},${p.window_open},${hp},${si},${bp},${cr},${ds}`;
   });
 

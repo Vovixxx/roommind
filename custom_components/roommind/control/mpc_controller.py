@@ -99,6 +99,7 @@ _active_targets: dict[str, tuple[float | None, float | None]] = {}
 # that does not take the value is not commanded every cycle until the min-run ends.
 _overshoot_sent: set[str] = set()
 _switch_on_since: dict[str, float] = {}
+_switch_off_since: dict[str, float] = {}
 # Devices the hold already throttled to minimum (room past its target), one send per hold (#416).
 _hold_modulated: set[str] = set()
 # Last proportional setpoint send per device: (monotonic send time, (heat, cool) targets it was
@@ -1402,6 +1403,7 @@ class MPCController:
         self._setback_release: frozenset[str] = frozenset()
 
         s = settings or {}
+        self._settings = s
         self._mpc_enabled = is_mpc_enabled(s)
         self.outdoor_cooling_min = s.get("outdoor_cooling_min", DEFAULT_OUTDOOR_COOLING_MIN)
         self.outdoor_heating_max = s.get("outdoor_heating_max", DEFAULT_OUTDOOR_HEATING_MAX)
@@ -2003,6 +2005,7 @@ class MPCController:
             started = _switch_on_since.get(eid)
             if not want_on and not force_off and started is not None and min_run > 0 and (now - started) < min_run:
                 want_on = True
+            want_on = self._boiler_group_hold(eid, want_on, now, force_off)
             await self.hass.services.async_call(
                 "switch",
                 "turn_on" if want_on else "turn_off",
@@ -2012,8 +2015,28 @@ class MPCController:
             )
             if want_on:
                 _switch_on_since.setdefault(eid, now)
+                _switch_off_since.pop(eid, None)
             else:
+                if eid in _switch_on_since:
+                    _switch_off_since[eid] = now
                 _switch_on_since.pop(eid, None)
+
+    def _boiler_group_hold(self, entity_id: str, want_on: bool, now: float, force_off: bool) -> bool:
+        """House boiler group: shared minimum run and minimum off, like a compressor."""
+        if force_off:
+            return False
+        for group in self._settings.get("boiler_groups") or []:
+            if entity_id not in group.get("members", []):
+                continue
+            min_run = float(group.get("min_run_minutes", 10)) * 60
+            min_off = float(group.get("min_off_minutes", 5)) * 60
+            started = _switch_on_since.get(entity_id)
+            stopped = _switch_off_since.get(entity_id)
+            if want_on and stopped is not None and (now - stopped) < min_off:
+                return False
+            if not want_on and started is not None and (now - started) < min_run:
+                return True
+        return want_on
 
     async def async_apply(
         self,

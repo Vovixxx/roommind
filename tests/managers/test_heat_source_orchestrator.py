@@ -599,6 +599,26 @@ class TestEvaluateHeatSources:
         assert trv_cmds[0].role == "primary"
         assert not ac_cmds[0].active
 
+    def test_plant_that_cannot_hold_joins_the_backup_immediately(self):
+        """Comfort join does not wait out the timer when the plant coast leaves the band."""
+        hass = _make_hass(["heat", "cool"])
+        room = _make_room(policy="hydronic_first")
+        result = evaluate_heat_sources(
+            room,
+            MODE_HEATING,
+            0.7,
+            19.0,
+            21.0,
+            12.0,
+            "none",
+            hass,
+            now_monotonic=1000.0,
+            primary_on_since=1000.0,
+            plant_cannot_hold=True,
+        )
+        assert result is not None
+        assert result.active_sources == "both"
+
     def test_cool_only_device_is_left_out_of_heating(self):
         hass = _make_hass(["heat", "cool"])
         room = _make_room()

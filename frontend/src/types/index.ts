@@ -95,6 +95,14 @@ export interface DeviceConfig {
 export type ConflictResolution =
   "heating_priority" | "cooling_priority" | "majority" | "outdoor_temp";
 
+export interface BoilerGroup {
+  id: string;
+  name: string;
+  members: string[];
+  min_run_minutes: number;
+  min_off_minutes: number;
+}
+
 export interface CompressorGroup {
   id: string;
   name: string;
@@ -206,6 +214,7 @@ export interface GlobalSettings {
   mold_prevention_notify_enabled?: boolean;
   mold_prevention_notify_targets?: NotificationTarget[];
   compressor_groups?: CompressorGroup[];
+  boiler_groups?: BoilerGroup[];
   room_order?: string[];
   group_by_floor?: boolean;
   boost_applied_at?: Record<string, number>;

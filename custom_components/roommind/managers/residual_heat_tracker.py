@@ -16,14 +16,20 @@ class ResidualHeatTracker:
         self._off_power: dict[str, float] = {}
         self._on_since: dict[str, float] = {}
 
-    def get_q_residual(self, area_id: str, system_type: str, previous_mode: str) -> float:
+    def get_q_residual(
+        self,
+        area_id: str,
+        system_type: str,
+        previous_mode: str,
+        tau_minutes: float | None = None,
+    ) -> float:
         """Compute residual heat from previous cycle state."""
         if not system_type or area_id not in self._off_since or previous_mode == MODE_HEATING:
             return 0.0
         elapsed = (time.time() - self._off_since[area_id]) / 60.0
         heat_dur = (self._off_since[area_id] - self._on_since.get(area_id, self._off_since[area_id])) / 60.0
         last_pf = self._off_power.get(area_id, 1.0)
-        return compute_residual_heat(elapsed, system_type, last_pf, heat_dur)
+        return compute_residual_heat(elapsed, system_type, last_pf, heat_dur, tau_minutes)
 
     def update(
         self, area_id: str, mode: str, power_fraction: float, previous_mode: str, q_residual: float = 0.0

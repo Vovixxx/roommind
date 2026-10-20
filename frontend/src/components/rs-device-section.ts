@@ -4,7 +4,14 @@ import type { HomeAssistant, HassArea, DeviceConfig, DeviceType } from "../types
 import { getEntitiesForArea } from "../utils/room-state";
 import { localize } from "../utils/localize";
 import { getSelectValue, openEntityInfo } from "../utils/events";
-import { tempUnit, toDisplayDelta, toCelsiusDelta, usesFahrenheit } from "../utils/temperature";
+import {
+  tempUnit,
+  toCelsius,
+  toCelsiusDelta,
+  toDisplay,
+  toDisplayDelta,
+  usesFahrenheit,
+} from "../utils/temperature";
 import { masterDetailStyles } from "../styles/master-detail-styles";
 import { inputStyles } from "../styles/input-styles";
 import "./shared/rs-master-detail";
@@ -388,11 +395,15 @@ export class RsDeviceSection extends LitElement {
     let displayValue = "";
     if (type === "climate") {
       const ct = attrs.current_temperature as number | undefined;
-      if (ct != null) displayValue = `${ct.toFixed(1)}${tempUnit(this.hass)}`;
+      if (ct != null)
+        displayValue = `${this._displayTemp(ct, attrs.temperature_unit).toFixed(1)}${tempUnit(this.hass)}`;
     } else if (type === "temp") {
       const tempVal = entityId.startsWith("climate.") ? attrs.current_temperature : state;
+      const unit = entityId.startsWith("climate.")
+        ? attrs.temperature_unit
+        : attrs.unit_of_measurement;
       if (tempVal != null && tempVal !== "" && tempVal !== "unknown" && tempVal !== "unavailable")
-        displayValue = `${Number(tempVal).toFixed(1)}${tempUnit(this.hass)}`;
+        displayValue = `${this._displayTemp(Number(tempVal), unit).toFixed(1)}${tempUnit(this.hass)}`;
     } else {
       if (state && state !== "unknown" && state !== "unavailable")
         displayValue = `${Math.round(Number(state))}%`;
@@ -776,6 +787,21 @@ export class RsDeviceSection extends LitElement {
         <rs-info-icon .text=${localize("devices.behaviour_hint", lang)}></rs-info-icon>
       </div>
 
+      ${
+        isAc
+          ? html`
+              <div class="detail-toggle-row">
+                <ha-checkbox
+                  .checked=${device.role === "cool_only"}
+                  @change=${(e: Event) =>
+                    this._onCoolOnly(entityId, (e.target as HTMLInputElement).checked)}
+                ></ha-checkbox>
+                <span>${localize("devices.cool_only", lang)}</span>
+                <rs-info-icon .text=${localize("devices.cool_only_hint", lang)}></rs-info-icon>
+              </div>
+            `
+          : nothing
+      }
       ${
         isAc
           ? html`
@@ -1195,6 +1221,14 @@ export class RsDeviceSection extends LitElement {
     this._fireDeviceChanged(newDevices);
   }
 
+  private _displayTemp(value: number, entityUnit: unknown): number {
+    const unit = typeof entityUnit === "string" ? entityUnit : "";
+    const homeF = usesFahrenheit(this.hass);
+    if (unit === "°C" && homeF) return toDisplay(value, this.hass);
+    if (unit === "°F" && !homeF) return toCelsius(value, this.hass);
+    return value;
+  }
+
   private _behaviourLabel(kind: string): string {
     const key =
       kind === "electric"
@@ -1391,6 +1425,14 @@ export class RsDeviceSection extends LitElement {
         else delete updated.valve_closing_entity;
         return updated;
       }),
+    );
+  }
+
+  private _onCoolOnly(entityId: string, checked: boolean) {
+    this._fireDeviceChanged(
+      this.devices.map((d) =>
+        d.entity_id === entityId ? { ...d, role: checked ? "cool_only" : "auto" } : d,
+      ),
     );
   }
 

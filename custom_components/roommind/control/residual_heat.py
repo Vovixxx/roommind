@@ -22,6 +22,7 @@ def compute_residual_heat(
     system_type: str,
     last_power_fraction: float = 1.0,
     heating_duration_minutes: float = 0.0,
+    tau_minutes: float | None = None,
 ) -> float:
     """Compute normalised residual heat fraction after heating stopped.
 
@@ -46,7 +47,7 @@ def compute_residual_heat(
     if not profile or elapsed_minutes < 0:
         return 0.0
 
-    tau = profile["tau_minutes"]
+    tau = profile["tau_minutes"] if tau_minutes is None else tau_minutes
     initial = profile["initial_fraction"]
     tau_charge = profile.get("tau_charge_minutes", tau)
 

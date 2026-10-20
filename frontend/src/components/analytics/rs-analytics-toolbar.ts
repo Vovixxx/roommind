@@ -247,7 +247,7 @@ export class RsAnalyticsToolbar extends LitElement {
 
   private _exportCsv() {
     if (!this.data) return;
-    const csv = buildCsvString(this.data);
+    const csv = buildCsvString(this.data, this.hass);
     if (!csv) return;
     const filename = buildExportFilename(
       this.hass,
@@ -282,7 +282,7 @@ export class RsAnalyticsToolbar extends LitElement {
 
   private _copyCsvToClipboard() {
     if (!this.data) return;
-    const csv = buildCsvString(this.data);
+    const csv = buildCsvString(this.data, this.hass);
     if (!csv) return;
     copyToClipboard(csv);
     this._openDropdown = null;
