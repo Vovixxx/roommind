@@ -72,6 +72,7 @@
   "hero.heat_source_primary": "Heating: TRV",
   "hero.heat_source_secondary": "Heating: AC",
   "hero.heat_source_both": "Heating: TRV + AC",
+  "hero.heating": "Heating: {source}",
   "hero.permanent": "Permanent",
   "hero.waiting": "Waiting for sensor data...",
   "hero.not_configured": "Not configured yet",

@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { HomeAssistant, HassArea, RoomConfig, OverrideType } from "../types";
+import type { DeviceConfig, HomeAssistant, HassArea, RoomConfig, OverrideType } from "../types";
 import { getModeClass, formatMode, minutesLeft } from "../utils/room-state";
 import { modeStyles } from "../styles/shared-mode-styles";
 import { localize } from "../utils/localize";
@@ -358,6 +358,53 @@ export class RsHeroStatus extends LitElement {
     return null;
   }
 
+  private _deviceHeatName(device: DeviceConfig): string {
+    const kind = device.heating_system_type;
+    const key =
+      device.type === "switch" && kind === "underfloor"
+        ? "devices.system_type_radiant"
+        : kind === "underfloor"
+          ? "devices.system_type_underfloor"
+          : kind === "boiler"
+            ? "devices.system_type_boiler"
+            : kind === "electric"
+              ? "devices.system_type_electric"
+              : kind === "radiator"
+                ? "devices.system_type_radiator"
+                : kind === "heat_pump" || device.type === "ac"
+                  ? "devices.behaviour_heat_pump"
+                  : "devices.type_thermostat";
+    return localize(key, this.hass?.language ?? "en");
+  }
+
+  private _heatingLabel(active: string): string {
+    const lang = this.hass?.language ?? "en";
+    const devices = this.config?.devices ?? [];
+    const plant = devices.filter(
+      (device) =>
+        (device.type === "trv" || device.type === "switch") &&
+        device.role !== "secondary" &&
+        device.role !== "cool_only",
+    );
+    const backup = devices.filter(
+      (device) => device.type === "ac" && device.role !== "primary" && device.role !== "cool_only",
+    );
+    const chosen =
+      active === "both" ? [...plant, ...backup] : active === "secondary" ? backup : plant;
+    const names = [...new Set(chosen.map((device) => this._deviceHeatName(device)))];
+    if (names.length === 0) {
+      return localize(
+        active === "secondary"
+          ? "hero.heat_source_secondary"
+          : active === "both"
+            ? "hero.heat_source_both"
+            : "hero.heat_source_primary",
+        lang,
+      );
+    }
+    return localize("hero.heating", lang, { source: names.join(" + ") });
+  }
+
   private _renderTargetSection(live: NonNullable<RoomConfig["live"]>) {
     const targetTemp = live.target_temp;
     const l = this.hass?.language ?? "en";
@@ -640,13 +687,7 @@ export class RsHeroStatus extends LitElement {
                   live.active_heat_sources && live.active_heat_sources !== "none" && !this.isOutdoor
                     ? html`<div class="hero-metric">
                         <ha-icon icon="mdi:swap-horizontal"></ha-icon>
-                        ${
-                          live.active_heat_sources === "primary"
-                            ? localize("hero.heat_source_primary", this.hass?.language ?? "en")
-                            : live.active_heat_sources === "secondary"
-                              ? localize("hero.heat_source_secondary", this.hass?.language ?? "en")
-                              : localize("hero.heat_source_both", this.hass?.language ?? "en")
-                        }
+                        ${this._heatingLabel(live.active_heat_sources)}
                       </div>`
                     : nothing
                 }
