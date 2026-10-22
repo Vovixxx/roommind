@@ -599,25 +599,40 @@ class TestEvaluateHeatSources:
         assert trv_cmds[0].role == "primary"
         assert not ac_cmds[0].active
 
-    def test_plant_that_cannot_hold_joins_the_backup_immediately(self):
-        """Comfort join does not wait out the timer when the plant coast leaves the band."""
+    def test_short_gap_stays_on_the_plant_through_the_saved_wait(self):
+        """The backup joins only after the wait, and only while the gap is still at least the join gap."""
         hass = _make_hass(["heat", "cool"])
         room = _make_room(policy="hydronic_first")
-        result = evaluate_heat_sources(
+        room["heat_source_join_delta"] = 1.67
+        room["heat_source_join_hold_minutes"] = 60
+        early = evaluate_heat_sources(
             room,
             MODE_HEATING,
             0.7,
-            19.0,
-            21.0,
+            20.9,
+            22.0,
             12.0,
             "none",
             hass,
-            now_monotonic=1000.0,
-            primary_on_since=1000.0,
-            plant_cannot_hold=True,
+            now_monotonic=1_000.0,
+            primary_on_since=None,
         )
-        assert result is not None
-        assert result.active_sources == "both"
+        assert early is not None
+        assert early.active_sources == "primary"
+        held = evaluate_heat_sources(
+            room,
+            MODE_HEATING,
+            0.7,
+            20.9,
+            22.0,
+            12.0,
+            "primary",
+            hass,
+            now_monotonic=1_000.0 + 60 * 60,
+            primary_on_since=1_000.0,
+        )
+        assert held is not None
+        assert held.active_sources == "primary"
 
     def test_cool_only_device_is_left_out_of_heating(self):
         hass = _make_hass(["heat", "cool"])

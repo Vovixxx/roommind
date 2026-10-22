@@ -979,30 +979,6 @@ class RoomMindCoordinator(DataUpdateCoordinator):
             and get_ac_eids(room.get("devices", []))
         ):
             now = time.monotonic()
-            plant_cannot_hold = False
-            if (
-                room.get("heat_source_policy") == "hydronic_first"
-                and current_temp is not None
-                and targets.heat is not None
-                and self.outdoor_temp_effective is not None
-            ):
-                model = self._model_manager.get_model(area_id)
-                plant = room.get("heating_system_type") or ""
-                learned = self._source_behavior.rate(plant) if plant else None
-                coast = model.predict(
-                    current_temp,
-                    self.outdoor_temp_effective,
-                    0.0,
-                    30.0,
-                    q_residual=q_residual,
-                )
-                holding = model.predict(
-                    current_temp,
-                    self.outdoor_temp_effective,
-                    learned if learned is not None else model.Q_heat,
-                    30.0,
-                )
-                plant_cannot_hold = coast < targets.heat - 0.3 or holding < targets.heat - 0.3
             heat_source_plan = evaluate_heat_sources(
                 room_config=room,
                 mode=mode,
@@ -1014,7 +990,6 @@ class RoomMindCoordinator(DataUpdateCoordinator):
                 hass=self.hass,
                 now_monotonic=now,
                 primary_on_since=self._heat_source_primary_on_since.get(area_id),
-                plant_cannot_hold=plant_cannot_hold,
             )
             if heat_source_plan is not None:
                 self._heat_source_states[area_id] = heat_source_plan.active_sources
